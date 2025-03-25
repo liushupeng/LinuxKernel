@@ -364,22 +364,22 @@ void function() {
 
 ## 5.1 字符设备
 
-一个字符设备的实现：[driver/char_device/selfdevice.c](https://github.com/liushupeng/LinuxKernel/blob/master/driver/char_device/selfdevice.c) 
+一个字符设备的实现：[driver/char_device/basicdevice.c](https://github.com/liushupeng/LinuxKernel/blob/master/driver/char_device/basicdevice.c) 
 
 ### 5.1.1 编译模块
 
 ```bash
 $ cd driver/char_device
-$ KERNELDIR=/your/path/linux-6.1 make
+$ KERNELDIR=/your/path/linux-6.1/study-build make
 ```
 
 ### 5.1.2 载入模块
 
 ```bash
-$ insmod selfdevice.ko	# 设备名称 selfdevice
+$ insmod basicdevice.ko	# 设备名称 basicdevice
 $ cat /proc/devices		# 看到所有注册的设备主驱动号
 $ ls -l /dev/			# 设备节点文件，必须由 mknod 手动创建(5.1.2.1)，或者由 udev 自动创建(5.1.2.2)
-$ rmmod selfdevice.ko	# 卸载模块
+$ rmmod basicdevice.ko	# 卸载模块
 ```
 
 ### 5.1.3 创建设备
@@ -387,8 +387,8 @@ $ rmmod selfdevice.ko	# 卸载模块
 #### 5.1.3.1 手动创建
 
 ```bash
-$ mknod /dev/selfdevice c <主设备号> <次设备号>	# 主/次设备号需要日志中打印出来
-$ chmod 666 /dev/selfdevice
+$ mknod /dev/basicdevice c <主设备号> <次设备号>	# 主/次设备号需要日志中打印出来
+$ chmod 666 /dev/basicdevice
 ```
 
 #### 5.1.3.2 自动创建
@@ -401,19 +401,23 @@ $ chmod 666 /dev/selfdevice
 
 ```bash
 # 读设备
-$ cat /dev/selfdevice
+$ cat /dev/basicdevice
 
 # 写设备
-$ echo "Hello, selfdevice" > /dev/selfdevice
+$ echo "Hello, basicdevice" > /dev/basicdevice
 ```
 
-## 5.2 块设备
+## 5.2 IO端口
+
+
+
+## 5.3 块设备
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
 # 6 中断处理
 
-[Linux内核揭秘——中断](https://docs.hust.openatom.club/linux-insides-zh/interrupts) 
+什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的 事件（event）。
 
 # 7 系统调用
 
@@ -508,7 +512,6 @@ asmlinkage long sys_read(unsigned int fd, char __user *buf, size_t count)
 
 ```c
 // fs/read_write.c
-
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 {
     struct fd f = fdget_pos(fd);					// 获取 fd 关联的 file 结构
@@ -527,14 +530,14 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
     }
     return ret;
 }
-
 ```
 
 ## 7.5 vfs_read
 
-`file->f_op->read` 就是设备注册后，read() 操作对应的函数。
+vfs_read()实现很简单，此处需要重点说明一下  `file->f_op->read` 是如何和cdev_init()时指定的` struct file_operations *` 关联的。
 
 ```c
+// fs/read_write.c
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
     ...
@@ -548,6 +551,36 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 }
 ```
 
+cdev_init()的时候会把 `*fops` 保存在 `struct cdev` 的 `ops` 中
+
+```c
+// fs/char_dev.c
+void cdev_init(struct cdev *cdev, const struct file_operations *fops)
+{
+    ...
+    cdev->ops = fops;
+}
+```
+
+应用层程序使用`open()`时，会通过`...->vfs_open()->chrdev_open()`运行到chrdev_open()中
+
+```c
+// fs/char_dev.c
+static int chrdev_open(struct inode *inode, struct file *filp)
+{
+    const struct file_operations *fops;
+    struct cdev *p;
+
+    p = inode->i_cdev;			// p指向的就是cdev_init()的cdev
+    ...
+    fops = fops_get(p->ops);	// 拿到保存的struct file_operations指针
+    replace_fops(filp, fops);	// 将 struct file_operations 指针存储到 struct file 的 f_op
+    if (filp->f_op->open)
+        ret = filp->f_op->open(inode, filp);
+    ...
+}
+```
+
 # 8 进程管理
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
@@ -556,7 +589,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
-# 10 时间管理
+# 10 文件系统
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
@@ -564,7 +597,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
-# 12 文件系统
+# 12 时间管理
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
@@ -656,5 +689,141 @@ Linux 启动过程中，`init` 及其相关配置文件的访问顺序如下
 - 现代 Linux **（如 CentOS 7+/Ubuntu 16+）** 已使用 `systemd` 代替 `SysVinit`，不再依赖 `/etc/inittab`，而是 `/etc/systemd/system/`。
 - 但在嵌入式 Linux（BusyBox）或老旧系统中，`SysVinit` 仍然常见。
 
+# 15 参考章节
 
+## 15.1 手册
 
+在阅读源码的过程中，可能需要查询下列手册/官方文档：
+
+- [GCC 在线文档](https://gcc.gnu.org/onlinedocs/)（包括 GCC、CPP 等）
+- [GNU Binutils 在线文档](https://sourceware.org/binutils/index.html)（包括 ld、as 等）
+- [GNU 在线文档](https://www.gnu.org/manual/manual.html)（除了上述两个，还包括 Make 等）
+- [Linux Kernel 在线文档](https://www.kernel.org/doc/html/latest/) 
+
+## 15.2 内核简介
+
+1. 《Linux 内核设计与实现》 第 1 章：Linux 内核简介
+2. 《深入理解 Linux 内核》 第 一 章：绪论
+3. 《深入 Linux 内核架构》 第 1 章：简介和概述
+
+## 15.3 内核开发
+
+1. 《Linux 内核设计与实现》 第 2 章：从内核出发
+2. 《Linux 内核设计与实现》 第 18 章：调试
+3. 《Linux 内核设计与实现》 第 19 章：可移植性
+4. 《Linux 内核设计与实现》 第 20 章：补丁、开发和社区
+5. 《深入 Linux 内核架构》 附录 A：体系结构相关知识
+6. 《深入 Linux 内核架构》 附录 B：使用源代码
+7. 《深入 Linux 内核架构》 附录 F：内核开发过程
+
+## 15.4 GCC 扩展语法和内核数据结构
+
+1. 《Linux 内核设计与实现》 第 6 章：内核数据结构
+2. 《深入 Linux 内核架构》 附录 C：有关 C 语言的注记
+
+## 15.5 内存管理
+
+1. LKD3 第 12 章：内存管理
+2. ULK3 第 二 章：内存寻址
+3. ULK3 第 八 章：内存管理
+4. PLKA 第 3 章：内存管理
+
+## 15.6 进程管理
+
+1. 《Linux 内核设计与实现》 第 3 章：进程管理
+2. 《Linux 内核设计与实现》 第 4 章：进程调度
+3. 《深入理解 Linux 内核》 第 三 章：进程
+4. 《深入理解 Linux 内核》 第 七 章：进程调度
+5. 《深入 Linux 内核架构》 第 2 章：进程管理和调度
+
+## 15.7 进程地址空间
+
+1. 《Linux 内核设计与实现》 第 15 章：进程地址空间
+2. 《深入理解 Linux 内核》 第 九 章：进程地址空间
+3. 《深入 Linux 内核架构》 第 4 章：进程虚拟内存
+
+## 15.8 系统调用
+
+1. 《Linux 内核设计与实现》 第 5 章：系统调用
+2. 《深入理解 Linux 内核》 第 十 章：系统调用
+3. 《深入 Linux 内核架构》 第 13 章；系统调用
+
+## 15.9 中断
+
+1. 《Linux 内核设计与实现》 第 7 章：中断和中断处理
+2. 《Linux 内核设计与实现》 第 8 章：下半部和推后执行的工作
+3. 《深入理解 Linux 内核》 第 四 章：中断和异常
+4. 《深入 Linux 内核架构》 第 14 章：内核活动
+
+## 15.10 内核同步
+
+1. 《Linux 内核设计与实现》 第 9 章：内核同步介绍
+2. 《Linux 内核设计与实现》 第 10 章：内核同步方法
+3. 《深入理解 Linux 内核》 第 五 章：内核同步
+4. 《深入 Linux 内核架构》 第 5 章：锁与进程间通信（5.1 和 5.2）
+
+## 15.11 时间管理
+
+1. 《Linux 内核设计与实现》 第 11 章：定时器和时间管理
+2. 《深入理解 Linux 内核》 第 六 章：定时测量
+3. 《深入 Linux 内核架构》 第 15 章：时间管理
+
+## 15.12 虚拟文件系统
+
+1. 《Linux 内核设计与实现》 第 13 章：虚拟文件系统
+2. 《深入理解 Linux 内核》 第 十二 章：虚拟文件系统
+3. 《深入 Linux 内核架构》 第 8 章：虚拟文件系统
+
+## 15.13 高速缓存
+
+1. 《Linux 内核设计与实现》 第 16 章：页高速缓存和页回写
+2. 《深入理解 Linux 内核》 第 十五 章：页高速缓存
+3. 《深入 Linux 内核架构》 第 16 章：页缓存和块缓存
+4. 《深入 Linux 内核架构》 第 17 章：数据同步
+
+## 15.14 回收页框
+
+1. 《深入理解 Linux 内核》 第 十七 章：回收页框
+2. 《深入 Linux 内核架构》 第 18 章：页面回收和页交换
+
+## 15.15 文件系统
+
+1. 《深入理解 Linux 内核》 第 十六 章：访问文件
+2. 《深入理解 Linux 内核》 第 十八 章：Ext2 和 Ext3 文件系统
+3. 《深入 Linux 内核架构》 第 9 章：Ext 文件系统族
+4. 《深入 Linux 内核架构》 第 10 章：无持久存储的文件系统
+5. 《深入 Linux 内核架构》 第 11 章：扩展属性和访问控制表
+
+## 15.16 设备驱动程序
+
+1. 《深入理解 Linux 内核》 第 14 章：块 I/O 层
+2. 《深入理解 Linux 内核》 第 十三 章：I/O 体系结构和设备驱动程序
+3. 《深入理解 Linux 内核》 第 十四 章：块设备驱动程序
+4. 《深入 Linux 内核架构》 第 6 章：设备驱动程序
+
+## 15.17 模块
+
+1. 《Linux 内核设计与实现》 第 17 章：设备与模块
+2. 《深入理解 Linux 内核》 附录 二：模块
+3. 《深入 Linux 内核架构》 第 7 章：模块
+
+## 15.18 进程间通信
+
+1. 《深入理解 Linux 内核》 第 十一 章：信号
+2. 《深入理解 Linux 内核》 第 十九章：进程通信
+3. 《深入 Linux 内核架构》 第 5 章：锁与进程间通信（其余部分）
+
+## 15.19 程序的执行
+
+1. 《深入理解 Linux 内核》 第 二十 章：程序的执行
+2. 《深入 Linux 内核架构》 附录 E：ELF 二进制格式
+
+## 15.20 系统启动
+
+1. 《深入理解 Linux 内核》 附录 一：系统启动
+2. 《深入 Linux 内核架构》 附录 D：系统启动
+
+## 15.21 其他内容
+
+1. 《深入 Linux 内核架构》 第 12 章：网络
+2. 《深入 Linux 内核架构》 第 19 章：审计

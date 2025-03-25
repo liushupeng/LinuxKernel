@@ -11,30 +11,30 @@ static bool          dev_succ = false;
 static dev_t         dev_num  = 0;       /* device number */
 static struct cdev   cdev;               /* char device */
 static struct class* dev_class   = NULL; /* device class */
-const char*          DEVICE_NAME = "selfdevice";
+const char*          DEVICE_NAME = "basicdevice";
 
-MODULE_AUTHOR("Alessandro Rubini, Jonathan Corbet");
+MODULE_AUTHOR("Liu Shupeng");
 MODULE_LICENSE("Dual BSD/GPL");
 
-int selfdevice_open(struct inode* inode, struct file* filp)
+int basicdevice_open(struct inode* inode, struct file* filp)
 {
-    pr_info("Enter open ...\n");
+    pr_info("Enter open() ...\n");
     return 0;
 }
 
-int selfdevice_release(struct inode* inode, struct file* filp)
+int basicdevice_release(struct inode* inode, struct file* filp)
 {
-    pr_info("Enter close ...\n");
+    pr_info("Enter close() ...\n");
     return 0;
 }
 
-ssize_t selfdevice_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
+ssize_t basicdevice_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
 {
     ssize_t result;
-    char*   buffer = "Hello, welcome to selfdevice read function";
+    char*   buffer = "Hello, welcome to basicdevice read function";
     size_t  len    = strlen(buffer);
 
-    pr_info("Enter read ...\n");
+    pr_info("Enter read() ...\n");
     if (*f_pos >= len) {
         return 0;
     }
@@ -56,13 +56,13 @@ ssize_t selfdevice_read(struct file* filp, char __user* buf, size_t count, loff_
     return count;
 }
 
-ssize_t selfdevice_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
+ssize_t basicdevice_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
 {
     ssize_t result;
     char    buffer[128];
     size_t  len = sizeof(buffer);
 
-    pr_info("Enter write ...\n");
+    pr_info("Enter write() ...\n");
     if (*f_pos >= len) {
         return 0;
     }
@@ -82,12 +82,12 @@ ssize_t selfdevice_write(struct file* filp, const char __user* buf, size_t count
     return count;
 }
 
-struct file_operations selfdevice_fops = {
+struct file_operations basicdevice_fops = {
     .owner   = THIS_MODULE,
-    .open    = selfdevice_open,
-    .release = selfdevice_release,
-    .read    = selfdevice_read,
-    .write   = selfdevice_write,
+    .open    = basicdevice_open,
+    .release = basicdevice_release,
+    .read    = basicdevice_read,
+    .write   = basicdevice_write,
 };
 
 /*
@@ -95,7 +95,7 @@ struct file_operations selfdevice_fops = {
  * Thefore, it must be careful to work correctly even if some of the items
  * have not been initialized
  */
-void selfdevice_cleanup(void)
+void basicdevice_cleanup(void)
 {
     if (dev_succ) {
         device_destroy(dev_class, dev_num);
@@ -114,7 +114,7 @@ void selfdevice_cleanup(void)
     }
 }
 
-int selfdevice_init(void)
+int basicdevice_init(void)
 {
     char  major[32];
     char  minor[32];
@@ -131,15 +131,15 @@ int selfdevice_init(void)
      */
     result = alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
     if (result < 0) {
-        pr_err("alloc device number failed, result:%d\n", result);
+        pr_err("Alloc device number failed, result:%d\n", result);
         return result;
     }
-    pr_notice("major:%d minor:%d\n", MAJOR(dev_num), MINOR(dev_num));
+    pr_notice("Device major:%d minor:%d\n", MAJOR(dev_num), MINOR(dev_num));
 
     /*
      * Initialize cdev and bind fops
      */
-    cdev_init(&cdev, &selfdevice_fops);
+    cdev_init(&cdev, &basicdevice_fops);
     cdev.owner = THIS_MODULE;
 
     /*
@@ -147,8 +147,8 @@ int selfdevice_init(void)
      */
     result = cdev_add(&cdev, dev_num, 1);
     if (result < 0) {
-        pr_err("cdev add failed, result:%d\n", result);
-        selfdevice_cleanup();
+        pr_err("Add cdev failed, result:%d\n", result);
+        basicdevice_cleanup();
         return result;
     }
 
@@ -156,10 +156,10 @@ int selfdevice_init(void)
     /*
      * Create device class
      */
-    dev_class = class_create(THIS_MODULE, "selfdevice_class");
+    dev_class = class_create(THIS_MODULE, "basicdevice_class");
     if (IS_ERR(dev_class)) {
         pr_err("Failed to create class\n");
-        selfdevice_cleanup();
+        basicdevice_cleanup();
         return PTR_ERR(dev_class);
     }
 
@@ -168,7 +168,7 @@ int selfdevice_init(void)
      */
     if (device_create(dev_class, NULL, dev_num, NULL, DEVICE_NAME) == NULL) {
         pr_err("Failed to create device\n");
-        selfdevice_cleanup();
+        basicdevice_cleanup();
         return -1;
     }
     dev_succ = true;
@@ -186,19 +186,19 @@ int selfdevice_init(void)
         for (i = 0, s = 0; i < sizeof(mknod) / sizeof(mknod[0]); i++) {
             s = scnprintf(command + s, sizeof(command) - s, "%s ", mknod[i]);
         }
-        pr_err("Failed to run: %s, errno: %d\n", command, result);
+        pr_err("Failed to run: %s, result: %d\n", command, result);
     }
     result = call_usermodehelper(chmod[0], chmod, envp, UMH_WAIT_EXEC);
     if (result != 0) {
         for (i = 0, s = 0; i < sizeof(chmod) / sizeof(chmod[0]); i++) {
             s = scnprintf(command + s, sizeof(command) - s, "%s ", chmod[i]);
         }
-        pr_err("Failed to run: %s, errno: %d\n", command, result);
+        pr_err("Failed to run: %s, result: %d\n", command, result);
     }
 #endif
 
     return 0;
 }
 
-module_init(selfdevice_init);
-module_exit(selfdevice_cleanup);
+module_init(basicdevice_init);
+module_exit(basicdevice_cleanup);

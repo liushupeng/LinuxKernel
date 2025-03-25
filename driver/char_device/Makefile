@@ -25,6 +25,6 @@ clean:
 
 else
     # called from kernel build system: just declare what our modules are
-    obj-m := selfdevice.o
+    obj-m := basicdevice.o
 endif
 
