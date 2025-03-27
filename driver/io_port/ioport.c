@@ -1,46 +1,47 @@
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define pr_fmt(fmt) "%s:%s:%d:%s() " fmt, KBUILD_MODNAME, FILENAME, __LINE__, __func__
 
+#include <asm/io.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/kmod.h>
 
-static bool          dev_succ = false;
-static dev_t         dev_num  = 0;       /* device number */
-static struct cdev   cdev;               /* char device */
-static struct class* dev_class   = NULL; /* device class */
-static const char*   DEVICE_NAME = "basicdevice";
+bool             dev_succ = false;
+dev_t            dev_num  = 0;        /* device number */
+struct cdev      cdev;                /* char device */
+struct class*    dev_class    = NULL; /* device class */
+unsigned long    ioport_base  = 0x378;
+const char*      DEVICE_NAME  = "ioport";
+struct resource* dev_resource = NULL;
 
 MODULE_AUTHOR("Liu Shupeng");
 MODULE_LICENSE("Dual BSD/GPL");
 
-int basicdevice_open(struct inode* inode, struct file* filp)
+int ioport_open(struct inode* inode, struct file* filp)
 {
     pr_info("Enter open() ...\n");
     return 0;
 }
 
-int basicdevice_release(struct inode* inode, struct file* filp)
+int ioport_release(struct inode* inode, struct file* filp)
 {
     pr_info("Enter close() ...\n");
     return 0;
 }
 
-ssize_t basicdevice_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
+ssize_t ioport_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
 {
-    ssize_t result;
-    char*   buffer = "Hello, welcome to basicdevice read function";
-    size_t  len    = strlen(buffer);
+    ssize_t i, result;
+    char    buffer[128];
 
     pr_info("Enter read() ...\n");
-    if (*f_pos >= len) {
-        return 0;
-    }
 
-    if (*f_pos + count > len) {
-        count = len - *f_pos;
+    /* 8 bit read */
+    for (i = 0; i < count; i++) {
+        buffer[i] = inb(ioport_base);
+        rmb();
     }
 
     result = copy_to_user(buf, buffer + *f_pos, count);
@@ -58,9 +59,9 @@ ssize_t basicdevice_read(struct file* filp, char __user* buf, size_t count, loff
     return count;
 }
 
-ssize_t basicdevice_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
+ssize_t ioport_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
 {
-    ssize_t result;
+    ssize_t i, result;
     char    buffer[128];
     size_t  len = sizeof(buffer);
 
@@ -81,25 +82,31 @@ ssize_t basicdevice_write(struct file* filp, const char __user* buf, size_t coun
     *f_pos += count;
     pr_info("User space data: %s", buffer);
 
+    /* 8 bit write */
+    for (i = 0; i < count; i++) {
+        outb(buffer[i], ioport_base);
+        wmb();
+    }
+
     return count;
 }
 
-struct file_operations basicdevice_fops = {
+struct file_operations ioport_fops = {
     .owner   = THIS_MODULE,
-    .open    = basicdevice_open,
-    .release = basicdevice_release,
-    .read    = basicdevice_read,
-    .write   = basicdevice_write,
+    .open    = ioport_open,
+    .release = ioport_release,
+    .read    = ioport_read,
+    .write   = ioport_write,
 };
 
 #ifdef AUTO_CREATE_DEVICE
-int basicdevice_create_device(void)
+int ioport_create_device(void)
 {
     struct device* device;
     /*
      * Create device class
      */
-    dev_class = class_create(THIS_MODULE, "basicdevice_class");
+    dev_class = class_create(THIS_MODULE, "ioport_class");
     if (IS_ERR(dev_class)) {
         pr_err("Failed to create class\n");
         return PTR_ERR(dev_class);
@@ -118,7 +125,7 @@ int basicdevice_create_device(void)
     return 0;
 }
 #else
-int basicdevice_create_device(void)
+int ioport_create_device(void)
 {
     int  i, s, result;
     char major[32];
@@ -166,7 +173,7 @@ int basicdevice_create_device(void)
  * Thefore, it must be careful to work correctly even if some of the items
  * have not been initialized
  */
-void basicdevice_cleanup(void)
+void ioport_cleanup(void)
 {
     if (dev_succ) {
         device_destroy(dev_class, dev_num);
@@ -183,12 +190,25 @@ void basicdevice_cleanup(void)
     if (dev_num != 0) {
         unregister_chrdev_region(dev_num, 1);
     }
+
+    if (dev_resource != NULL) {
+        release_region(ioport_base, 1);
+    }
 }
 
-int basicdevice_init(void)
+int ioport_init(void)
 {
     int result;
     memset(&cdev, 0, sizeof(struct cdev));
+
+    /*
+     * Get I/O resources.
+     */
+    dev_resource = request_region(ioport_base, 1, DEVICE_NAME);
+    if (dev_resource == NULL) {
+        pr_err("can't get I/O port address 0x%lx\n", ioport_base);
+        return -EBUSY;
+    }
 
     /*
      * Get a dynamic device number.
@@ -196,6 +216,7 @@ int basicdevice_init(void)
     result = alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
     if (result < 0) {
         pr_err("Alloc device number failed, result:%d\n", result);
+        ioport_cleanup();
         return result;
     }
     pr_notice("Device major:%d minor:%d\n", MAJOR(dev_num), MINOR(dev_num));
@@ -203,7 +224,7 @@ int basicdevice_init(void)
     /*
      * Initialize cdev and bind fops
      */
-    cdev_init(&cdev, &basicdevice_fops);
+    cdev_init(&cdev, &ioport_fops);
     cdev.owner = THIS_MODULE;
 
     /*
@@ -212,22 +233,22 @@ int basicdevice_init(void)
     result = cdev_add(&cdev, dev_num, 1);
     if (result < 0) {
         pr_err("Add cdev failed, result:%d\n", result);
-        basicdevice_cleanup();
+        ioport_cleanup();
         return result;
     }
 
     /*
      * Create device
      */
-    result = basicdevice_create_device();
+    result = ioport_create_device();
     if (result < 0) {
         pr_err("Failed to create device, result:%d\n", result);
-        basicdevice_cleanup();
+        ioport_cleanup();
         return result;
     }
 
     return 0;
 }
 
-module_init(basicdevice_init);
-module_exit(basicdevice_cleanup);
+module_init(ioport_init);
+module_exit(ioport_cleanup);

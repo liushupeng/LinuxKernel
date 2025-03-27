@@ -3,12 +3,13 @@
 - [Linux 内核学习笔记](https://freeflyingsheep.github.io/posts/kernel/kernel/) $^{[1]}$
 - [Linux内核应该怎么去学习](https://www.zhihu.com/question/58121772) $^{[2]}$
 - [怎么搭建学习Linux内核的运行、调试环境？](https://www.zhihu.com/question/66594120/answer/245555815) 
+- [Linux内核精通](https://github.com/0voice/linux_kernel_wiki) 
 
 $[1]$ 原作者整理了《深入理解 Linux 内核》、《Linux 内核设计与实现》和《深入 Linux 内核架构》相关章节的内容以及个人理解。不过这个系列最终烂尾，但是里面现存内容还是很有价值的。
 
 $[2]$ 按照这个答案提供的路线：[学习内核功夫在代码之外](https://www.zhihu.com/question/58121772/answer/428003091 ) 
 
-# 1 学习路径
+# 1 学习路线
 
 1️⃣首先要搭建一个Linux的学习环境：建议使用Qemu虚拟机+装一个标准的Ubuntu Linux，学习简单的Linux使用方法，更重要的是学习编译Linux内核 ✅ 
 
@@ -377,8 +378,8 @@ $ KERNELDIR=/your/path/linux-6.1/study-build make
 
 ```bash
 $ insmod basicdevice.ko	# 设备名称 basicdevice
-$ cat /proc/devices		# 看到所有注册的设备主驱动号
-$ ls -l /dev/			# 设备节点文件，必须由 mknod 手动创建(5.1.2.1)，或者由 udev 自动创建(5.1.2.2)
+$ cat /proc/devices		# 查看所有注册的设备主驱动号
+$ ls -l /dev/			# 设备节点文件，须由 mknod 手动创建(5.1.3.1)，或者由 udev 自动创建(5.1.3.2)
 $ rmmod basicdevice.ko	# 卸载模块
 ```
 
@@ -407,9 +408,29 @@ $ cat /dev/basicdevice
 $ echo "Hello, basicdevice" > /dev/basicdevice
 ```
 
-## 5.2 IO端口
+## 5.2 I/O端口
 
+一个I/O端口的实现：[driver/io_port/ioport.c](https://github.com/liushupeng/LinuxKernel/blob/master/driver/io_port/ioport.c) 
 
+### 5.2.1 载入模块
+
+```bash
+$ insmod ioport.ko
+$ cat /proc/devices		# 查看所有注册的设备主驱动号
+$ ls -l /dev/			# 设备节点文件
+$ cat /proc/ioports		# 查看已分配的 I/O 端口范围
+$ rmmod basicdevice.ko
+```
+
+### 5.2.2 读写设备
+
+```bash
+# 读设备
+$ dd if=/dev/ioport bs=1 count=1 | od -t x1
+
+# 写设备
+$ echo -n "any string" > /dev/ioport
+```
 
 ## 5.3 块设备
 
@@ -547,7 +568,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
         ret = new_sync_read(file, buf, count, pos);
     else
         ret = -EINVAL;
-	...
+    ...
 }
 ```
 
