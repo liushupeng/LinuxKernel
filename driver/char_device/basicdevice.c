@@ -3,9 +3,6 @@
 
 #include <linux/cdev.h>
 #include <linux/fs.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/kmod.h>
 
 static bool          dev_succ = false;
 static dev_t         dev_num  = 0;       /* device number */
@@ -13,7 +10,7 @@ static struct cdev   cdev;               /* char device */
 static struct class* dev_class   = NULL; /* device class */
 static const char*   DEVICE_NAME = "basicdevice";
 
-MODULE_AUTHOR("Liu Shupeng");
+MODULE_AUTHOR("Liu ShuPeng");
 MODULE_LICENSE("Dual BSD/GPL");
 
 int basicdevice_open(struct inode* inode, struct file* filp)
@@ -118,26 +115,14 @@ int basicdevice_create_device(void)
     return 0;
 }
 #else
-int basicdevice_create_device(void)
+int usermode_create_device(char* major, char* minor, char* device)
 {
     int  i, s, result;
-    char major[32];
-    char minor[32];
-    char device[32];
     char command[128];
 
     char* envp[3]  = {"HOME=/", "PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL};
-    char* mknod[6] = {"/bin/mknod", NULL, "c", NULL, NULL, NULL};
-    char* chmod[4] = {"/bin/chmod", "664", NULL, NULL};
-
-    scnprintf(major, sizeof(major), "%d", MAJOR(dev_num));
-    scnprintf(minor, sizeof(minor), "%d", MINOR(dev_num));
-    scnprintf(device, sizeof(device), "/dev/%s", DEVICE_NAME);
-
-    mknod[1] = device;
-    mknod[3] = major;
-    mknod[4] = minor;
-    chmod[2] = device;
+    char* mknod[6] = {"/bin/mknod", device, "c", major, minor, NULL};
+    char* chmod[4] = {"/bin/chmod", "664", device, NULL};
 
     result = call_usermodehelper(mknod[0], mknod, envp, UMH_WAIT_EXEC);
     if (result != 0) {
@@ -156,8 +141,26 @@ int basicdevice_create_device(void)
         pr_err("Failed to run: %s\n", command);
         return result;
     }
-
     return 0;
+}
+
+int basicdevice_create_device(void)
+{
+    int  result;
+    char major[32];
+    char minor[32];
+    char device[32];
+
+    scnprintf(major, sizeof(major), "%d", MAJOR(dev_num));
+    scnprintf(minor, sizeof(minor), "%d", MINOR(dev_num));
+    scnprintf(device, sizeof(device), "/dev/%s", DEVICE_NAME);
+
+    result = usermode_create_device(major, minor, device);
+    if (result != 0) {
+        pr_err("User mode create device failed: %d\n", result);
+    }
+
+    return result;
 }
 #endif
 

@@ -116,11 +116,11 @@ CONFIG_NET_SCH_FQ=y
 ### 2.2.3 生成 .config
 
 ```bash
-$ make O=study-build defconfig	# 缺省配置，配置项存储在.config文件，编译输出目录为study-build
+$ make O=study-build defconfig  # 缺省配置，配置项存储在.config文件，编译输出目录为study-build
 $ cd study-build
 $ cp .config .config.default
-$ make kvm_guest.config			# 配置 kernel/configs/kvm_guest.config
-$ make study.config				# 配置 kernel/configs/study.config
+$ make kvm_guest.config         # 配置 kernel/configs/kvm_guest.config
+$ make study.config             # 配置 kernel/configs/study.config
 ```
 
 ### 2.2.4 编译
@@ -128,12 +128,12 @@ $ make study.config				# 配置 kernel/configs/study.config
 针对编译错误，需要逐个修改，一般的修改需要在Makefile中添加类似 `CFLAGS_shmem.o = -O2` 这样的内容。具体的修改可以参照：[Build kernel with -Og, and net/ with -O0](https://github.com/chenshuo/linux-debug/commit/aaa6b46038e1b3798ec3d9fc4ed1ccffd0b7f6b2) 
 
 ```bash
-$ make -j$(nproc)				# make V=1 可以看到完整命令
+$ make -j$(nproc)               # make V=1 可以看到完整命令
 ...
 
   LD      arch/x86/boot/setup.elf
   OBJCOPY arch/x86/boot/setup.bin
-  BUILD   arch/x86/boot/bzImage	# 最终产出结果
+  BUILD   arch/x86/boot/bzImage # 最终产出结果
 Kernel: arch/x86/boot/bzImage is ready  (#1)
 ```
 
@@ -148,11 +148,11 @@ $ wget https://busybox.net/downloads/busybox-1.37.0.tar.bz2
 # 2. 配置(静态编译)
 $ make menuconfig
 Settings  --->
-		[*] Build BusyBox as a static binary (no shared libs) 
+        [*] Build BusyBox as a static binary (no shared libs) 
 
 # 3. 编译
 $ make -j$(nproc)
-$ make install		# install的目录是 busybox-src/_install/*
+$ make install        # install的目录是 busybox-src/_install/*
 ```
 
 ## 3.2 创建rootfs
@@ -166,8 +166,8 @@ $ cd rootfs
 $ rm linuxrc && ln -s bin/busybox init
 
 # dev设备
-$ sudo mknod -m 600 dev/console c 5 1	# 控制台设备
-$ sudo mknod -m 666 dev/null c 1 3		# 空设备
+$ sudo mknod -m 600 dev/console c 5 1   # 控制台设备
+$ sudo mknod -m 666 dev/null c 1 3      # 空设备
 
 # inittab 自启动
 $ vi etc/inittab
@@ -222,7 +222,7 @@ qemu-system-x86_64 \
 ### 4.1.2 退出内核
 
 ```bash
-$ Ctrl + a					# 表示后面要执行一个 QEMU 内部命令
+$ Ctrl + a                  # 表示后面要执行一个 QEMU 内部命令
 $ x
 ```
 
@@ -233,26 +233,39 @@ $ x
 ```bash
 $ gdb vmlinux
 (gdb) target remote :1234
-(gdb) b start_kernel		# 设置断点
-(gdb) c  					# 继续运行
+(gdb) c                     # 继续运行
 ```
 
-### 4.2.2 调试模块
+### 4.2.2 加载模块
 
 ```bash
-$ lsmod | grep faulty			# QEMU中找到模块的地址
+$ lsmod | grep faulty       # QEMU中找到模块的地址
 faulty 24576 1 - Loading 0xffffffffa0000000 (O+)
 (gdb) add-symbol-file faulty.ko 0xffffffffa0000000
-(gdb) list *faulty_init+0x4d
+(gdb) b start_kernel        # 设置断点
+```
+
+### 4.2.3 调试panic
+
+```bash
+...
+[   92.031134] Kernel panic - not syncing: stack-protector: Kernel stack is corrupted in: time_timer+0x2cb/0x2db [time]
+...
+```
+
+假设错误日志信息如上，连接到gdb后，
+
+```bash
+(gdb) list *time_timer+0x2cb # 找到函数出错位置对应行数
 ```
 
 ## 4.3 代码调试
 
 《Linux设备驱动程序》的第四章提供了一些方法，比如：printk()、oops等，这部分的内容是网络信息的补充。
 
-### 4.3.1 printk()和pr_xxx()
+### 4.3.1 printk()
 
-printk()提供了不同的打印等级。通过 CONFIG_MESSAGE_LOGLEVEL_DEFAULT 可以调整。为避免编译时可能出现很多的WARNING，打印格式需要额外注意一下
+printk()提供了不同的打印等级。通过 CONFIG_MESSAGE_LOGLEVEL_DEFAULT 可以调整。为避免编译时可能出现很多的WARNING，打印格式请参照如下表格
 
 | 数据类型           | printk格式符 |
 | ------------------ | ------------ |
@@ -265,9 +278,7 @@ printk()提供了不同的打印等级。通过 CONFIG_MESSAGE_LOGLEVEL_DEFAULT 
 | ssize_t            | %zd or %zx   |
 | 函数指针           | %pf          |
 
-pr_xxx()系列函数（比如pr_info(), pr_debug()），在内核编译时打开CONFIG_DYNAMIC_DEBUG宏时，可以动态打印信息。并且信息中自动包含了：文件名路径 + 行号 + 函数名
-
-### 4.3.2 print_hex_dump()和dump_stack()
+### 4.3.2 dump_stack()
 
 print_hex_dump() 用来在内核打印二进制数据。
 
@@ -275,7 +286,7 @@ dump_stack() 可以帮助开发人员追踪函数的调用路径。也可以在�
 
 ```c
 void function() {
-    // 代码逻辑
+    ...
     pr_info("Dumping stack trace:\n");
     dump_stack();  // 触发调用堆栈打印信息
 }
@@ -312,6 +323,12 @@ void function() {
 [   84.415408]  </TASK>
 ```
 
+Call Trace 的输出结果中都是地址，不包含文件名和行号。为了便于查看，可以将输出结果保存到日志中，然后用 `decode_stacktrace.sh` 脚本来解析
+
+```bash
+$ ./scripts/decode_stacktrace.sh vmlinux auto /path/to/module.ko < CallTrace.txt
+```
+
 ### 4.3.3 objdump
 
 ```bash
@@ -327,8 +344,8 @@ int faulty_init(void)
 {
 ...
   f0:   48 c7 c7 00 00 00 00    mov    $0x0,%rdi
-  f7:   e8 00 00 00 00          call   fc <faulty_init+0x4d>	# 找到 faulty_init+0x4d 位置
-    *(int *)0 = 0;												# 可以看到对空指针赋值
+  f7:   e8 00 00 00 00          call   fc <faulty_init+0x4d>  # 找到 faulty_init+0x4d 位置
+    *(int *)0 = 0;                                            # 可以看到对空指针赋值
   fc:   c7 04 25 00 00 00 00    movl   $0x0,0x0
 ...
 }
@@ -347,15 +364,15 @@ int faulty_init(void)
 
 ```c
 void function() {
-    // 代码逻辑
+    /* 代码逻辑 */
     if (some_critical_condition) {
-        BUG();							// 这将停止内核执行并打印堆栈跟踪
+        BUG();                       // 这将停止内核执行并打印堆栈跟踪
     }
 }
 
 void function() {
-    // 代码逻辑
-    BUG_ON(some_critical_condition);	// 如果some_critical_condition为true，则触发BUG
+    /* 代码逻辑 */
+    BUG_ON(some_critical_condition); // 如果some_critical_condition为true，则触发BUG
 }
 ```
 
@@ -377,10 +394,10 @@ $ KERNELDIR=/your/path/linux-6.1/study-build make
 ### 5.1.2 载入模块
 
 ```bash
-$ insmod basicdevice.ko	# 设备名称 basicdevice
-$ cat /proc/devices		# 查看所有注册的设备主驱动号
-$ ls -l /dev/			# 设备节点文件，须由 mknod 手动创建(5.1.3.1)，或者由 udev 自动创建(5.1.3.2)
-$ rmmod basicdevice.ko	# 卸载模块
+$ insmod basicdevice.ko # 设备名称 basicdevice
+$ cat /proc/devices     # 查看所有注册的设备主驱动号
+$ ls -l /dev/           # 设备节点文件，须由 mknod 手动创建(5.1.3.1)，或者由 udev 自动创建(5.1.3.2)
+$ rmmod basicdevice.ko  # 卸载模块
 ```
 
 ### 5.1.3 创建设备
@@ -388,7 +405,7 @@ $ rmmod basicdevice.ko	# 卸载模块
 #### 5.1.3.1 手动创建
 
 ```bash
-$ mknod /dev/basicdevice c <主设备号> <次设备号>	# 主/次设备号需要日志中打印出来
+$ mknod /dev/basicdevice c <主设备号> <次设备号>  # 主/次设备号需要日志中打印出来
 $ chmod 666 /dev/basicdevice
 ```
 
@@ -416,9 +433,9 @@ $ echo "Hello, basicdevice" > /dev/basicdevice
 
 ```bash
 $ insmod ioport.ko
-$ cat /proc/devices		# 查看所有注册的设备主驱动号
-$ ls -l /dev/			# 设备节点文件
-$ cat /proc/ioports		# 查看已分配的 I/O 端口范围
+$ cat /proc/devices     # 查看所有注册的设备主驱动号
+$ ls -l /dev/           # 设备节点文件
+$ cat /proc/ioports     # 查看已分配的 I/O 端口范围
 $ rmmod basicdevice.ko
 ```
 
@@ -440,6 +457,12 @@ $ echo -n "any string" > /dev/ioport
 
 什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的 事件（event）。
 
+
+
+## 6.1 定时器中断
+
+
+
 # 7 系统调用
 
 [Linux内核揭秘——系统调用](https://docs.hust.openatom.club/linux-insides-zh/syscall) 
@@ -451,9 +474,9 @@ $ echo -n "any string" > /dev/ioport
 ```assembly
 /* arch/x86/entry/entry_64.S */
 SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
-    pushq   %rax		/* rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax */
+    pushq   %rax        /* rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax */
 
-    PUSH_AND_CLEAR_REGS rax=$-ENOSYS	/* 设置默认返回值 -ENOSYS */
+    PUSH_AND_CLEAR_REGS rax=$-ENOSYS  /* 设置默认返回值 -ENOSYS */
 
     /* IRQs are off. */
     movq    %rsp, %rdi
@@ -464,7 +487,7 @@ SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
     IBRS_ENTER
     UNTRAIN_RET
 
-    call    do_syscall_64       /* returns with IRQs disabled */
+    call    do_syscall_64             /* returns with IRQs disabled */
 
     ...
 ```
@@ -519,8 +542,8 @@ static __always_inline bool do_syscall_x64(struct pt_regs *regs, int nr)
 ```c
 // include/linux/syscalls.h
 #define SYSCALL_DEFINE3(name, ...) SYSCALL_DEFINEx(3, _##name, __VA_ARGS__)
-#define SYSCALL_DEFINEx(x, sname, ...)              \
-    SYSCALL_METADATA(sname, x, __VA_ARGS__)         \
+#define SYSCALL_DEFINEx(x, sname, ...)         \
+    SYSCALL_METADATA(sname, x, __VA_ARGS__)    \
     __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
 
 // 展开前
@@ -535,19 +558,19 @@ asmlinkage long sys_read(unsigned int fd, char __user *buf, size_t count)
 // fs/read_write.c
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 {
-    struct fd f = fdget_pos(fd);					// 获取 fd 关联的 file 结构
+    struct fd f = fdget_pos(fd);                  // 获取 fd 关联的 file 结构
     ssize_t ret = -EBADF;
 
     if (f.file) {
-        loff_t pos, *ppos = file_ppos(f.file);		// 处理文件偏移量
+        loff_t pos, *ppos = file_ppos(f.file);    // 处理文件偏移量
         if (ppos) {
             pos = *ppos;
             ppos = &pos;
         }
-        ret = vfs_read(f.file, buf, count, ppos);	// 读取数据
+        ret = vfs_read(f.file, buf, count, ppos); // 读取数据
         if (ret >= 0 && ppos)
             f.file->f_pos = pos;
-        fdput_pos(f);								// 更新文件偏移量
+        fdput_pos(f);                             // 更新文件偏移量
     }
     return ret;
 }
@@ -592,10 +615,10 @@ static int chrdev_open(struct inode *inode, struct file *filp)
     const struct file_operations *fops;
     struct cdev *p;
 
-    p = inode->i_cdev;			// p指向的就是cdev_init()的cdev
+    p = inode->i_cdev;          // p指向的就是cdev_init()的cdev
     ...
-    fops = fops_get(p->ops);	// 拿到保存的struct file_operations指针
-    replace_fops(filp, fops);	// 将 struct file_operations 指针存储到 struct file 的 f_op
+    fops = fops_get(p->ops);    // 拿到保存的struct file_operations指针
+    replace_fops(filp, fops);   // 将 struct file_operations 指针存储到 struct file 的 f_op
     if (filp->f_op->open)
         ret = filp->f_op->open(inode, filp);
     ...
@@ -620,7 +643,176 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 
 # 12 时间管理
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+时间管理主要分为三个部分：延迟、定时器、队列。这其中有两个比较基础的变量：节拍频率 `HZ` 和系统启动以来产生的节拍的总数 `jiffies`，讨论时间相关内容都无法脱离这两个变量。
+
+由于 jiffies 存在溢出的可能，所以内核提供了一系列的宏来判断两个 jiffies 的大小
+
+```c
+time_after(a, b);      /* 相当于 a > b  */
+time_before(a, b);     /* 相当于 a < b  */
+time_after_eq(a, b);   /* 相当于 a >= b */
+time_before_eq(a, b);  /* 相当于 a <= b */
+```
+
+与时间管理相关的实现：[time/time.c](https://github.com/liushupeng/LinuxKernel/blob/master/time/time.c) 
+
+## 12.1 延迟
+
+延时就是如何高效的实现sleep()。低分辨率的延时可以基于 HZ 来做，但是高分辨率的延时实现依赖具体的体系架构，比较复杂。
+
+### 12.1.1 高分辨率延迟
+
+这三个延迟函数均是忙等待函数，因而在延迟过程中无法运行其他任务。
+
+```c
+void ndelay(unsigned long nsecs);  /* 纳秒 */
+void udelay(unsigned long usecs);  /* 微秒 */
+void mdelay(unsigned long msecs);  /* 毫秒 */
+```
+
+### 12.1.2 低分辨率延迟
+
+低分辨率延迟实现方案也很多，比如忙等待、让出CPU等，但这些方案都会对系统增加额外的负担。实现延迟的最好方法是由主动变为被动，让内核为我们完成相应工作，而不是我们自己决定如何做。
+
+一种是通过等待队列的超时来实现：
+
+```c
+long wait_event_timeout(wait_queue_head_t q, condition, long timeout);
+long wait_event_interruptible_timeout(wait_queue_head_t q, condition, long timeout);
+```
+
+另一种是通过进程调度超时来实现：
+
+```c
+long schedule_timeout(long timeout);
+```
+
+从实现效果来看，精度的确不够
+
+```bash
+$ insmod time.ko
+$ dd bs=20 count=5 if=/proc/timequeue      # 等待队列超时
+4297563837 4297564865
+4297564867 4297565888
+4297565892 4297566913
+4297566915 4297567937
+4297567939 4297568961
+$ dd bs=20 count=5 if=/proc/timeschedto    # 进程调度超时
+4298854360 4298855425
+4298855425 4298856449
+4298856449 4298857473
+4298857473 4298858499
+4298858505 4298859520
+```
+
+## 12.2 定时器
+
+### 12.2.1 定时器API
+
+```c
+/* include/linux/timer.h */
+struct timer_list {
+    struct hlist_node entry;
+    unsigned long     expires;
+    void              (*function)(struct timer_list *);
+    u32               flags; /* 记录了定时器放置到桶的编号以及绑定到的CPU */
+};
+
+void timer_setup(struct timer_list *timer, (*function)(struct timer_list *), u32 flags); /* 初始化 */
+void add_timer(struct timer_list *timer);  /* 添加到定时器 */
+int del_timer(struct timer_list *timer);   /* 从定时器删除 */
+```
+
+### 12.2.2 实现原理
+
+-   [带你走进linux 内核 定时器（timer）实现机制](https://zhuanlan.zhihu.com/p/544432546) 
+
+一个定时器是使用 `struct timer_list` 结构体来表示的，对于系统中的成千上万个定时器，通过称作时间轮（Timer Wheel）的结构来高效管理，这个结构用 `struct timer_base` 结构体来表示。
+
+```c
+/* kernel/time/timer.c */
+struct timer_base {
+    raw_spinlock_t    lock;               /* 保护该结构体的自旋锁 */
+    struct timer_list *running_timer;     /* 当前CPU正在处理的定时器所对应的timer_list结构 */
+    unsigned long     clk;                /* 当前定时器所经过的 jiffies，用来判断包含的定时器是否已经到期或超时 */
+    unsigned long     next_expiry;        /* 该CPU下一个即将到期的定时器 */
+    unsigned int      cpu;                /* 所属的CPU号 */
+    bool              next_expiry_recalc;
+    bool              is_idle;            /* 是否处于空闲模式下 */
+    bool              timers_pending;
+    DECLARE_BITMAP(pending_map, WHEEL_SIZE);
+    struct hlist_head vectors[WHEEL_SIZE];/* WHEEL_SIZE = 9 * 64 = 576 */
+} ____cacheline_aligned;
+```
+
+<img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
+
+#### 12.2.2.1 确定time_list对应的桶
+
+[calc_wheel_index()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L533) 函数通过计算离到期 jiffies 的长短，决定定时器放置到哪个桶下，每个桶的粒度（精度）是不同的。
+
+| Level | offset | 粒度       | 差值范围               |
+| ----- | ------ | ---------- | ---------------------- |
+| 0     | 0      | 1 Tick     | [0,63]                 |
+| 1     | 64     | 8 Ticks    | [64,511]               |
+| 2     | 128    | 64 Ticks   | [512,4096]             |
+| 3     | 192    | 512 Ticks  | [4096,32767]           |
+| 4     | 256    | 4096 Ticks | [32768,262143]         |
+| 5     | 320    | 1 Ticks    | [262144,2097151]       |
+| 6     | 384    | 1 Ticks    | [2097152,16777215]     |
+| 7     | 448    | 1 Ticks    | [16777216,134217727]   |
+| 8     | 512    | 1 Ticks    | [134217728,1073741822] |
+
+#### 12.2.2.2 time_list加入到对应的桶
+
+ [enqueue_timer()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L601) 函数会将定时器放到 timer_base 的某个桶中。
+
+#### 12.2.2.3 时钟中断处理
+
+时钟中断触发时，[tick_periodic()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/tick-common.c#L85) 函数会执行具体的工作。主要的函数调用流：`update_process_times() -> run_local_timers() -> raise_softirq(TIMER_SOFTIRQ) -> run_timer_softirq()`。更详细的关系，可以在自己设置的定时器的回调函数中通过`dump_stack()` 打印出来。
+
+## 12.3 队列
+
+`tasklet` 基于软中断（softirq）机制，不能阻塞； `workqueue` 基于内核线程（worker thread）机制，可以阻塞、睡眠。
+
+### 12.3.1 tasklet
+
+每个 `tasklet` 是 `tasklet_struct`，包含一个函数指针和数据；被调度后加入 `softirq` 的队列中；最终由 `ksoftirqd` 或中断上下文直接调用（`__do_softirq()`）；更详细的介绍移步 `14.2` 相关章节
+
+```c
+// include/linux/interrupt.h
+struct tasklet_struct
+{
+    struct tasklet_struct *next;
+    unsigned long state;
+    atomic_t count;
+    bool use_callback;
+    union {
+        void (*func)(unsigned long data);
+        void (*callback)(struct tasklet_struct *t);
+    };
+    unsigned long data;
+};
+```
+
+### 12.3.2 workqueue
+
+每个 `work_struct` 封装一个函数，调度时会被加入到对应 CPU 的 workqueue 队列，每个 CPU 有对应的 `kworker` 线程处理这些 work。更详细的介绍移步 `14.2` 相关章节
+
+```c
+/* 工作相关操作 */
+INIT_WORK(struct work_struct *, void (*func)(struct work_struct *));
+
+/* 工作队列相关操作 */
+struct workqueue_struct * create_workqueue(const char * name);
+struct workqueue_struct * create_singlethread_workqueue(const char * name);
+int cancel_delayed_work(struct work_struct *work);
+void flush_workqueue(struct workqueue_struct *queue);
+void destroy_workqueue(struct workqueue_struct *queue);
+
+/* 工作和工作队列关联 */
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
+```
 
 # 13 页缓存和块缓存
 
@@ -644,16 +836,16 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 
 ```bash
 ...
-CONFIG_HYPERVISOR_GUEST=y		# 使内核能够识别自己运行在 hypervisor（如 KVM）中，并进行优化
-CONFIG_PARAVIRT=y				# 启用半虚拟化支持，使 Guest OS 可以使用 hypervisor 提供的优化特性
-CONFIG_KVM_GUEST=y				# 启用 KVM Guest 模式，使内核能够在 KVM 虚拟机中运行，并优化性能
+CONFIG_HYPERVISOR_GUEST=y  # 使内核能够识别自己运行在 hypervisor（如 KVM）中，并进行优化
+CONFIG_PARAVIRT=y          # 启用半虚拟化支持，使 Guest OS 可以使用 hypervisor 提供的优化特性
+CONFIG_KVM_GUEST=y         # 启用 KVM Guest 模式，使内核能够在 KVM 虚拟机中运行，并优化性能
 CONFIG_S390_GUEST=y
-CONFIG_VIRTIO=y					# 启用 VirtIO 设备支持，用于提供高性能的虚拟 I/O（如磁盘、网络）
+CONFIG_VIRTIO=y            # 启用 VirtIO 设备支持，用于提供高性能的虚拟 I/O（如磁盘、网络）
 CONFIG_VIRTIO_MENU=y
-CONFIG_VIRTIO_PCI=y				# 启用 VirtIO PCI 设备支持，使 Guest 能够访问 VirtIO 设备
-CONFIG_VIRTIO_BLK=y				# 启用 VirtIO 磁盘支持，提高虚拟机的磁盘 I/O 性能
+CONFIG_VIRTIO_PCI=y        # 启用 VirtIO PCI 设备支持，使 Guest 能够访问 VirtIO 设备
+CONFIG_VIRTIO_BLK=y        # 启用 VirtIO 磁盘支持，提高虚拟机的磁盘 I/O 性能
 CONFIG_VIRTIO_CONSOLE=y
-CONFIG_VIRTIO_NET=y				# 启用 VirtIO 网络设备，提供高效的网络通信
+CONFIG_VIRTIO_NET=y        # 启用 VirtIO 网络设备，提供高效的网络通信
 ...
 ```
 
@@ -662,35 +854,35 @@ CONFIG_VIRTIO_NET=y				# 启用 VirtIO 网络设备，提供高效的网络通�
 一些适合自己学习的选项
 
 ```bash
-CONFIG_FUNCTION_TRACER=y	# 启用 函数级跟踪，用于分析内核中函数的调用情况，有助于调试和性能优化
-CONFIG_DEBUG_INFO=y			# 生成调试符号信息，用于 GDB、addr2line 等工具进行调试
-CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y	# 让内核使用默认的 DWARF 格式来存储调试信息，适用于现代调试工具
-CONFIG_GDB_SCRIPTS=y		# 允许 GDB 使用内核提供的调试脚本，这些脚本可以帮助 GDB 解析复杂的内核结构体，提高调试效率
-CONFIG_READABLE_ASM=y		# 让生成的汇编代码更加可读，优化编译器生成的汇编代码结构，便于调试和分析
+CONFIG_FUNCTION_TRACER=y    # 启用 函数级跟踪，用于分析内核中函数的调用情况，有助于调试和性能优化
+CONFIG_DEBUG_INFO=y         # 生成调试符号信息，用于 GDB、addr2line 等工具进行调试
+CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y # 让内核使用默认的 DWARF 格式来存储调试信息，适用于现代调试工具
+CONFIG_GDB_SCRIPTS=y        # 允许 GDB 使用内核提供的调试脚本，这些脚本可以帮助 GDB 解析复杂的内核结构体，提高调试效率
+CONFIG_READABLE_ASM=y       # 让生成的汇编代码更加可读，优化编译器生成的汇编代码结构，便于调试和分析
 
-CONFIG_EXT2_FS=y			# 启用 对 Ext2 文件系统的支持
+CONFIG_EXT2_FS=y            # 启用 对 Ext2 文件系统的支持
 
-CONFIG_EXPERT=y				# 启用 专家模式，允许访问某些高级（且可能不稳定）的内核选项
-CONFIG_BUG=n				# 禁用 BUG() 宏，使内核在遇到严重错误时不会触发 BUG() 终止，而是继续运行
-CONFIG_RANDOMIZE_BASE=n		# 关闭 KASLR（内核地址空间随机化），这可能会降低安全性，但可能有利于调试
-CONFIG_IA32_EMULATION=n		# 禁用 32 位应用程序支持
-CONFIG_RETPOLINE=n			# 关闭 Retpoline（防 Spectre v2 攻击），可能会提高性能，但会降低安全性
-CONFIG_JUMP_LABEL=n			# 关闭 静态分支优化，可能会影响性能
+CONFIG_EXPERT=y             # 启用 专家模式，允许访问某些高级（且可能不稳定）的内核选项
+CONFIG_BUG=n                # 禁用 BUG() 宏，使内核在遇到严重错误时不会触发 BUG() 终止，而是继续运行
+CONFIG_RANDOMIZE_BASE=n     # 关闭 KASLR（内核地址空间随机化），这可能会降低安全性，但可能有利于调试
+CONFIG_IA32_EMULATION=n     # 禁用 32 位应用程序支持
+CONFIG_RETPOLINE=n          # 关闭 Retpoline（防 Spectre v2 攻击），可能会提高性能，但会降低安全性
+CONFIG_JUMP_LABEL=n         # 关闭 静态分支优化，可能会影响性能
 
-CONFIG_ACPI=n				# 禁用 ACPI（高级配置与电源管理接口），这通常适用于虚拟机或嵌入式系统
-CONFIG_DRM=n				# 禁用 Direct Rendering Manager（DRM），即图形驱动程序支持
-CONFIG_SOUND=n				# 禁用 声音支持，适用于无音频需求的环境（如服务器、容器等）
-CONFIG_ETHERNET=n			# 禁用 以太网支持，这可能意味着该内核只用于特定用途（如 Wi-Fi 设备或没有网络需求的系统）
+CONFIG_ACPI=n               # 禁用 ACPI（高级配置与电源管理接口），这通常适用于虚拟机或嵌入式系统
+CONFIG_DRM=n                # 禁用 Direct Rendering Manager（DRM），即图形驱动程序支持
+CONFIG_SOUND=n              # 禁用 声音支持，适用于无音频需求的环境（如服务器、容器等）
+CONFIG_ETHERNET=n           # 禁用 以太网支持，这可能意味着该内核只用于特定用途（如 Wi-Fi 设备或没有网络需求的系统）
 
-CONFIG_NFS_FS=n				# 禁用 NFS（网络文件系统），适用于不需要远程文件系统的场景
-CONFIG_NETFILTER=n			# 禁用 Netfilter（防火墙/数据包过滤），适用于不需要防火墙功能的内核
-CONFIG_WLAN=n				# 禁用 Wi-Fi 支持，适用于不需要无线网络的设备
-CONFIG_WIRELESS=n			# 禁用 无线网络栈，与 CONFIG_WLAN 类似
+CONFIG_NFS_FS=n             # 禁用 NFS（网络文件系统），适用于不需要远程文件系统的场景
+CONFIG_NETFILTER=n          # 禁用 Netfilter（防火墙/数据包过滤），适用于不需要防火墙功能的内核
+CONFIG_WLAN=n               # 禁用 Wi-Fi 支持，适用于不需要无线网络的设备
+CONFIG_WIRELESS=n           # 禁用 无线网络栈，与 CONFIG_WLAN 类似
 
-CONFIG_TUN=y				# 启用 TUN/TAP 设备，这在VPN、Docker 网络、KVM 虚拟机等场景下非常重要
-CONFIG_TCP_CONG_BBR=y		# 启用 BBR 拥塞控制算法
-CONFIG_NET_SCH_FQ_CODEL=y	# 启用 FQ-CoDel（Fair Queuing Controlled Delay），可以减少网络拥塞
-CONFIG_NET_SCH_FQ=y			# 启用 Fair Queueing（FQ）调度算法，用于优化流量公平性，减少某些连接的垄断
+CONFIG_TUN=y                # 启用 TUN/TAP 设备，这在VPN、Docker 网络、KVM 虚拟机等场景下非常重要
+CONFIG_TCP_CONG_BBR=y       # 启用 BBR 拥塞控制算法
+CONFIG_NET_SCH_FQ_CODEL=y   # 启用 FQ-CoDel（Fair Queuing Controlled Delay），可以减少网络拥塞
+CONFIG_NET_SCH_FQ=y         # 启用 Fair Queueing（FQ）调度算法，用于优化流量公平性，减少某些连接的垄断
 ```
 
 ## 14.2 Linux启动顺序
@@ -709,6 +901,61 @@ Linux 启动过程中，`init` 及其相关配置文件的访问顺序如下
 
 - 现代 Linux **（如 CentOS 7+/Ubuntu 16+）** 已使用 `systemd` 代替 `SysVinit`，不再依赖 `/etc/inittab`，而是 `/etc/systemd/system/`。
 - 但在嵌入式 Linux（BusyBox）或老旧系统中，`SysVinit` 仍然常见。
+
+## 14.3 基础数据结构
+
+### 14.3.1 list
+
+```c
+struct list_head {
+    struct list_head *next;
+    struct list_head *prev;
+};
+```
+
+### 14.3.2 hash list
+
+Linux 内核中哈希链表用 `struct hlist_node` 结构体表示。使用 `struct hlist_head` 作为入口，不直接使用 `struct hlist_node` 是为了节省一个指针的空间，因为对 `head` 节点来说不需要 `prev` 指针。
+
+需要特别说明几点：
+
+-   哈希链表这个叫法重点在**链表**上，这个结构只体现了哈希冲突的后使用的链表，没有体现一个完整哈希表的存储
+-   `hlist_node` 中 `**pprev` 字段看作保存前一个节点的 `next` 指针地址更好理解，赋值语句可能是 `node->pprev = &prev->next`
+-   使用 `**pprev` 而不是 `*pprev` ，并不会在空间上有节省。一方面在判断删除的节点不需要额外判断是否是头结点，另一方面头结点的类型是 `hlist_head` 而不是 `hlist_node`，无法直接指向。
+
+```c
+/* 哈希链表的唯一入口 */
+struct hlist_head {
+    struct hlist_node *first;    /* 指向哈希链表的第一个节点 */
+};
+
+struct hlist_node {
+    struct hlist_node *next;     /* 指向下一个节点 */
+    struct hlist_node **pprev;   /* 指向前一个节点的 `next` 指针 */
+};
+```
+
+## 14.4 高级数据结构
+
+### 14.4.1 completion
+
+<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+
+### 14.4.2 waitqueue
+
+<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+
+### 14.4.3 workqueue
+
+<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+
+### 14.4.4 tasklet
+
+<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+
+### 14.4.5 timer
+
+<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
 # 15 参考章节
 
