@@ -35,7 +35,7 @@ ssize_t ioport_read(struct file* filp, char __user* buf, size_t count, loff_t* f
 
     pr_info("Enter read() ...\n");
 
-    /* 8 bit read */
+    /* Interacting with hardware: 8 bit read */
     for (i = 0; i < count; i++) {
         buffer[i] = inb(ioport_base);
         rmb();
@@ -43,7 +43,7 @@ ssize_t ioport_read(struct file* filp, char __user* buf, size_t count, loff_t* f
 
     result = copy_to_user(buf, buffer + *f_pos, count);
     if (result != 0) {
-        pr_err("Failed to copy data to user space\n");
+        pr_err("Failed to copy data to user space, still %lu bytes not copied\n", result);
         return -EFAULT;
     }
     *f_pos += count;
@@ -73,13 +73,13 @@ ssize_t ioport_write(struct file* filp, const char __user* buf, size_t count, lo
 
     result = copy_from_user(buffer + *f_pos, buf, count);
     if (result != 0) {
-        pr_err("Failed to copy data from user space\n");
+        pr_err("Failed to copy data from user space, still %lu bytes not copied\n", result);
         return -EFAULT;
     }
     *f_pos += count;
     pr_info("User space data: %s", buffer);
 
-    /* 8 bit write */
+    /* Interacting with hardware: 8 bit write */
     for (i = 0; i < count; i++) {
         outb(buffer[i], ioport_base);
         wmb();

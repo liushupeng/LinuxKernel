@@ -1,29 +1,37 @@
 # Linux内核轻松入坑
 
-- [Linux 内核学习笔记](https://freeflyingsheep.github.io/posts/kernel/kernel/) $^{[1]}$
-- [Linux内核应该怎么去学习](https://www.zhihu.com/question/58121772) $^{[2]}$
-- [怎么搭建学习Linux内核的运行、调试环境？](https://www.zhihu.com/question/66594120/answer/245555815) 
+- [Linux 内核学习笔记](https://freeflyingsheep.github.io/zh-cn/posts/introduction/) $^{[1]}$ 
+- [Linux内核应该怎么去学习](https://www.zhihu.com/question/58121772) $^{[2]}$ 
+- [怎么搭建学习Linux内核的运行、调试环境](https://www.zhihu.com/question/66594120/answer/245555815) 
 - [Linux内核精通](https://github.com/0voice/linux_kernel_wiki) 
 
-$[1]$ 原作者整理了《深入理解 Linux 内核》、《Linux 内核设计与实现》和《深入 Linux 内核架构》相关章节的内容以及个人理解。不过这个系列最终烂尾，但是里面现存内容还是很有价值的。
+$[1]$ 原作者整理了《深入理解 Linux 内核》、《Linux 内核设计与实现》和《深入 Linux 内核架构》相关章节的内容以及作者个人的理解，里面的内容很有价值。本篇文章也参考了其中部分内容。
 
 $[2]$ 按照这个答案提供的路线：[学习内核功夫在代码之外](https://www.zhihu.com/question/58121772/answer/428003091 ) 
 
 # 1 学习路线
 
-1️⃣首先要搭建一个Linux的学习环境：建议使用Qemu虚拟机+装一个标准的Ubuntu Linux，学习简单的Linux使用方法，更重要的是学习编译Linux内核 ✅ 
+1️⃣首先要搭建一个Linux的学习环境：建议使用Qemu虚拟机+装一个标准的Ubuntu Linux，学习简单的Linux使用方法，更重要的是学习编译Linux内核$^{[1]}$ ✅ 
 
-2️⃣从《LINUX设备驱动程序》这本书入手，掌握编写标准的虚拟字符驱动方法，并亲自动写一个，验证通过 ✅ 
+2️⃣从《LINUX设备驱动程序》这本书入手，掌握编写标准的虚拟字符驱动方法，并亲自动写一个，验证通过$^{[2]}$ ✅ 
 
 3️⃣在基于2️⃣的代码里，对于open/write钩子调用backtrace函数输出驱动file_operations钩子函数的执行上下文，并根据backtrace调用栈，看每个函数长什么样，如果能分析到这些函数属于那个功能模块(比如syscall,vfs,device)就更好了 ✅ 
 
-4️⃣再从通用的、基础的功能模块开始学起，比如系统调用原理，中断处理 ❌
+4️⃣再从通用的、基础的功能模块开始学起，比如系统调用原理，中断处理 ✅ 
 
-5️⃣学习第4️⃣点任何知识时，建议找相关的参考书帮自己梳理知识脉络，更重的是动手修改代码验证自己的理解。比如新增一个系统调用，注册一个中断处理函数，看看执行起来是什么样子的。❌
+5️⃣学习第4️⃣点任何知识时，建议找相关的参考书帮自己梳理知识脉络，更重的是动手修改代码验证自己的理解。比如新增一个系统调用，注册一个中断处理函数，看看执行起来是什么样子的。$^{[3]}$✅ 
 
 6️⃣经过第5️⃣阶段的学习，可以系统学习某些大功能模块的机理了，比如虚拟内存、CFS调度算法、PageCache管理，某个文件系统(比如ext2)，网络协议栈等。❌
 
 7️⃣学会使用kernel的调试工具，比如Qemu+gdb调用内核，还有内核自身提供的ftrace,perf等功能都是很好的测量和分析工具 ✅ 
+
+------
+
+$[1]$ 本文章的例子都在Debian12（6.1内核）上编译验证通过
+
+$[2]$ 这本书的优点是随书提供了基于 2.6.10 内核的 [example code](https://github.com/vigoals/ldd)，当你在较新的内核上（比如6.1）编译它会遇到很多错误，解决这些错误也是一个学习Linux内核变化的很好途径。要善用ChatGPT
+
+$[3]$ 这一过程遇到不懂的方向尽情扩展，包括但不限于并发控制、时间管理，以看懂源码为宜。这个学习过程对后面第6️⃣部分学习会有很大帮助
 
 # 2 内核编译
 
@@ -111,6 +119,11 @@ CONFIG_TUN=y
 CONFIG_TCP_CONG_BBR=y
 CONFIG_NET_SCH_FQ_CODEL=y
 CONFIG_NET_SCH_FQ=y
+
+CONFIG_PARPORT=y
+CONFIG_PARPORT_PC=y
+CONFIG_PPDEV=y
+CONFIG_PRINTER=y
 ```
 
 ### 2.2.3 生成 .config
@@ -133,8 +146,10 @@ $ make -j$(nproc)               # make V=1 可以看到完整命令
 
   LD      arch/x86/boot/setup.elf
   OBJCOPY arch/x86/boot/setup.bin
-  BUILD   arch/x86/boot/bzImage # 最终产出结果
+  BUILD   arch/x86/boot/bzImage # 编译产出的内核镜像
 Kernel: arch/x86/boot/bzImage is ready  (#1)
+
+$ make modules -j$(nproc)       # 编译所有内核模块（.ko 文件）
 ```
 
 # 3 根文件系统
@@ -201,7 +216,7 @@ $ find . | cpio --create --format=newc | gzip > ../rootfs.img
 ### 4.1.1 启动内核
 
 ```bash
-qemu-system-x86_64 \
+$ qemu-system-x86_64 \
     -kernel linux-6.1/study-build/arch/x86/boot/bzImage \
     -initrd rootfs.img \
     -append "console=ttyS0 nokaslr" \
@@ -209,21 +224,21 @@ qemu-system-x86_64 \
     -nographic -s
 ```
 
-- `-kernel`: 指定刚刚编译的内核。
-- `-initrd`: 指定 RootFS 镜像。
+- `-kernel`: 指定刚刚编译的内核
+- `-initrd`: 指定 RootFS 镜像
 - `-append` 
-  - `console=ttyS0`: 将终端绑定到 QEMU。
-  - `nokaslr`: 禁用 KASLR，让内核地址固定。
-- `-nographic`: 运行纯命令行模式。
+  - `console=ttyS0`: 将终端绑定到 QEMU
+  - `nokaslr`: 禁用 KASLR，让内核地址固定
+- `-nographic`: 运行纯命令行模式
 - `-machine type=pc`: 确保 QEMU 支持 APIC
-- `-s`: 开启 GDB 远程调试端口（默认 1234）。
-- `-S`: 让 QEMU 在启动时暂停，等待调试器连接。
+- `-s`: 开启 GDB 远程调试端口（默认 1234）
+- `-S`: 让 QEMU 在启动时暂停，等待调试器连接
 
 ### 4.1.2 退出内核
 
 ```bash
-$ Ctrl + a                  # 表示后面要执行一个 QEMU 内部命令
-$ x
+$ Ctrl + a                  # QEMU 的控制前缀，表示后面要执行一个 QEMU 内部命令
+$ x                         # x:退出QEMU, s:暂停QEMU, r:重启QEMU
 ```
 
 ## 4.2 gdb调试
@@ -261,7 +276,7 @@ faulty 24576 1 - Loading 0xffffffffa0000000 (O+)
 
 ## 4.3 代码调试
 
-《Linux设备驱动程序》的第四章提供了一些方法，比如：printk()、oops等，这部分的内容是网络信息的补充。
+《Linux设备驱动程序》的第四章提供了一些方法，比如：printk()、oops等，这一章节是结合网络上的信息后的补充。
 
 ### 4.3.1 printk()
 
@@ -288,7 +303,7 @@ dump_stack() 可以帮助开发人员追踪函数的调用路径。也可以在�
 void function() {
     ...
     pr_info("Dumping stack trace:\n");
-    dump_stack();  // 触发调用堆栈打印信息
+    dump_stack();  /* 触发调用堆栈打印信息 */
 }
 ```
 
@@ -380,6 +395,14 @@ void function() {
 
 驱动子系统负责管理各种硬件设备，并提供统一的接口，使用户态程序可以访问这些设备。
 
+| 驱动类型            | 举例                         | 特点                            |
+| ------------------- | ---------------------------- | ------------------------------- |
+| **字符设备驱动**    | 串口、鼠标、GPIO、I2C 设备等 | 一次读写一个字节或一段数据      |
+| **块设备驱动**      | 硬盘、U 盘、SD 卡等          | 面向块读写（块大小一般是 512B） |
+| **网络设备驱动**    | 网卡、无线网卡等             | 实现协议栈接口，发送/接收数据包 |
+| **总线/控制器驱动** | USB、PCI、I2C 总线驱动       | 管理设备枚举、控制器初始化等    |
+| **USB 设备驱动**    | USB 鼠标、U 盘、USB 摄像头等 | 通过 USB 栈与内核通信           |
+
 ## 5.1 字符设备
 
 一个字符设备的实现：[driver/char_device/basicdevice.c](https://github.com/liushupeng/LinuxKernel/blob/master/driver/char_device/basicdevice.c) 
@@ -429,17 +452,38 @@ $ echo "Hello, basicdevice" > /dev/basicdevice
 
 一个I/O端口的实现：[driver/io_port/ioport.c](https://github.com/liushupeng/LinuxKernel/blob/master/driver/io_port/ioport.c) 
 
-### 5.2.1 载入模块
+### 5.2.1 启动QEMU
+
+这一部分实际上是需要涉及到硬件的，但是我们大多数情况下没有这种硬件设备，所以用 QEMU 来模拟并口。就是在 QEMU 启动的时候，额外添加如下参数。
+
+>   好吧，我尝试了很久，通过并口写入的数据并不能同步写入到ioport_output.bin中，没查到具体原因，先放弃了。
+
+```bash
+$ qemu-system-x86_64 \
+    ... \
+    -device isa-parallel,chardev=io,id=ioport,iobase=0x378 \
+    -chardev file,id=io,path=ioport_output.bin
+```
+
+-   device：添加一个虚拟硬件设备，并可以绑定到 `-chardev` 定义的字符设备上
+    -   isa-parallel: 表示一个ISA并口设备
+    -   chardev: 设备后端，值需要和 `-chardev`  的 `id` 保持一致
+    -   iobase: 指定端口地址，需要和代码中保持一致
+    -   id: 该设备的名称，需要和代码里 request_region() 最后一个参数保持一致
+-   chardev：指定一种字符设备的后端，例如 socket、pty、file、stdio 等
+    -   path: 数据保存位置，预期写入到并口的数据最终会保存在这个文件后，可以通过 `xxd` 或 `hexdump -C` 来查看
+
+### 5.2.2 载入模块
 
 ```bash
 $ insmod ioport.ko
 $ cat /proc/devices     # 查看所有注册的设备主驱动号
 $ ls -l /dev/           # 设备节点文件
 $ cat /proc/ioports     # 查看已分配的 I/O 端口范围
-$ rmmod basicdevice.ko
+$ rmmod ioport.ko
 ```
 
-### 5.2.2 读写设备
+### 5.2.3 读写设备
 
 ```bash
 # 读设备
@@ -449,19 +493,17 @@ $ dd if=/dev/ioport bs=1 count=1 | od -t x1
 $ echo -n "any string" > /dev/ioport
 ```
 
-## 5.3 块设备
-
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
-
 # 6 中断处理
 
-什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的 事件（event）。
+什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的事件（event）。为解决中断响应时间长的问题，Linux将中断处理例程分成两部分：顶半部和底半部。
 
+**顶半部**：是实际响应中断的例程，也就是用 request_irq 注册的中断例程
 
+**底半部**：是一个被顶半部调度，并在稍后更安全的时间内执行的例程
 
-## 6.1 定时器中断
+顶半部处理例程和底半部处理例程之间最大的不同，就是当底半部处理例程执行时，所有的中断都是打开的——这就是所谓的在更安全时间内运行。典型的情况是顶半部保存设备的数据到一个设备特定的缓冲区并调度它的底半部，然后退出，这个操作是非常快的。然后，底半部执行其他必要的工作，例如唤醒进程、启动另外的I/O操作等等。这种方式允许在底半部工作期间，顶半部还可以继续为新的中断服务。
 
-
+顶半部和底半部一般通过tasklet或workqueue来实现。关于这两者的实现可以移步 `12.3` 章节。一个中断处理的实现：[interrupt/interrupt.c](https://github.com/liushupeng/LinuxKernel/blob/master/interrupt/interrupt.c) 
 
 # 7 系统调用
 
@@ -472,22 +514,22 @@ $ echo -n "any string" > /dev/ioport
 `entry_SYSCALL_64_after_hwframe` 是 64 位系统调用处理的关键部分。
 
 ```assembly
-/* arch/x86/entry/entry_64.S */
+# arch/x86/entry/entry_64.S
 SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
-    pushq   %rax        /* rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax */
+    pushq   %rax        # rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax
 
-    PUSH_AND_CLEAR_REGS rax=$-ENOSYS  /* 设置默认返回值 -ENOSYS */
+    PUSH_AND_CLEAR_REGS rax=$-ENOSYS  # 设置默认返回值 -ENOSYS
 
-    /* IRQs are off. */
+    # IRQs are off
     movq    %rsp, %rdi
-    /* Sign extend the lower 32bit as syscall numbers are treated as int */
+    # Sign extend the lower 32bit as syscall numbers are treated as int
     movslq  %eax, %rsi
 
-    /* clobbers %rax, make sure it is after saving the syscall nr */
+    # clobbers %rax, make sure it is after saving the syscall nr
     IBRS_ENTER
     UNTRAIN_RET
 
-    call    do_syscall_64             /* returns with IRQs disabled */
+    call    do_syscall_64             # returns with IRQs disabled
 
     ...
 ```
@@ -707,7 +749,7 @@ $ dd bs=20 count=5 if=/proc/timeschedto    # 进程调度超时
 
 ## 12.2 定时器
 
-### 12.2.1 定时器API
+定时器实现原理介绍移步 `14.4` 相关章节
 
 ```c
 /* include/linux/timer.h */
@@ -723,61 +765,13 @@ void add_timer(struct timer_list *timer);  /* 添加到定时器 */
 int del_timer(struct timer_list *timer);   /* 从定时器删除 */
 ```
 
-### 12.2.2 实现原理
-
--   [带你走进linux 内核 定时器（timer）实现机制](https://zhuanlan.zhihu.com/p/544432546) 
-
-一个定时器是使用 `struct timer_list` 结构体来表示的，对于系统中的成千上万个定时器，通过称作时间轮（Timer Wheel）的结构来高效管理，这个结构用 `struct timer_base` 结构体来表示。
-
-```c
-/* kernel/time/timer.c */
-struct timer_base {
-    raw_spinlock_t    lock;               /* 保护该结构体的自旋锁 */
-    struct timer_list *running_timer;     /* 当前CPU正在处理的定时器所对应的timer_list结构 */
-    unsigned long     clk;                /* 当前定时器所经过的 jiffies，用来判断包含的定时器是否已经到期或超时 */
-    unsigned long     next_expiry;        /* 该CPU下一个即将到期的定时器 */
-    unsigned int      cpu;                /* 所属的CPU号 */
-    bool              next_expiry_recalc;
-    bool              is_idle;            /* 是否处于空闲模式下 */
-    bool              timers_pending;
-    DECLARE_BITMAP(pending_map, WHEEL_SIZE);
-    struct hlist_head vectors[WHEEL_SIZE];/* WHEEL_SIZE = 9 * 64 = 576 */
-} ____cacheline_aligned;
-```
-
-<img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
-
-#### 12.2.2.1 确定time_list对应的桶
-
-[calc_wheel_index()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L533) 函数通过计算离到期 jiffies 的长短，决定定时器放置到哪个桶下，每个桶的粒度（精度）是不同的。
-
-| Level | offset | 粒度       | 差值范围               |
-| ----- | ------ | ---------- | ---------------------- |
-| 0     | 0      | 1 Tick     | [0,63]                 |
-| 1     | 64     | 8 Ticks    | [64,511]               |
-| 2     | 128    | 64 Ticks   | [512,4096]             |
-| 3     | 192    | 512 Ticks  | [4096,32767]           |
-| 4     | 256    | 4096 Ticks | [32768,262143]         |
-| 5     | 320    | 1 Ticks    | [262144,2097151]       |
-| 6     | 384    | 1 Ticks    | [2097152,16777215]     |
-| 7     | 448    | 1 Ticks    | [16777216,134217727]   |
-| 8     | 512    | 1 Ticks    | [134217728,1073741822] |
-
-#### 12.2.2.2 time_list加入到对应的桶
-
- [enqueue_timer()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L601) 函数会将定时器放到 timer_base 的某个桶中。
-
-#### 12.2.2.3 时钟中断处理
-
-时钟中断触发时，[tick_periodic()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/tick-common.c#L85) 函数会执行具体的工作。主要的函数调用流：`update_process_times() -> run_local_timers() -> raise_softirq(TIMER_SOFTIRQ) -> run_timer_softirq()`。更详细的关系，可以在自己设置的定时器的回调函数中通过`dump_stack()` 打印出来。
-
 ## 12.3 队列
 
 `tasklet` 基于软中断（softirq）机制，不能阻塞； `workqueue` 基于内核线程（worker thread）机制，可以阻塞、睡眠。
 
 ### 12.3.1 tasklet
 
-每个 `tasklet` 是 `tasklet_struct`，包含一个函数指针和数据；被调度后加入 `softirq` 的队列中；最终由 `ksoftirqd` 或中断上下文直接调用（`__do_softirq()`）；更详细的介绍移步 `14.2` 相关章节
+每个 `tasklet` 是 `tasklet_struct`，包含一个函数指针和数据；被调度后加入 `softirq` 的队列中；最终由 `ksoftirqd` 或中断上下文直接调用（`__do_softirq()`）；更详细的介绍移步 `14.4` 相关章节
 
 ```c
 // include/linux/interrupt.h
@@ -797,7 +791,7 @@ struct tasklet_struct
 
 ### 12.3.2 workqueue
 
-每个 `work_struct` 封装一个函数，调度时会被加入到对应 CPU 的 workqueue 队列，每个 CPU 有对应的 `kworker` 线程处理这些 work。更详细的介绍移步 `14.2` 相关章节
+每个 `work_struct` 封装一个函数，调度时会被加入到对应 CPU 的 workqueue 队列，每个 CPU 有对应的 `kworker` 线程处理这些 work。更详细的介绍移步 `14.4` 相关章节
 
 ```c
 /* 工作相关操作 */
@@ -885,7 +879,7 @@ CONFIG_NET_SCH_FQ_CODEL=y   # 启用 FQ-CoDel（Fair Queuing Controlled Delay）
 CONFIG_NET_SCH_FQ=y         # 启用 Fair Queueing（FQ）调度算法，用于优化流量公平性，减少某些连接的垄断
 ```
 
-## 14.2 Linux启动顺序
+## 14.2 Linux配置加载
 
 Linux 启动过程中，`init` 及其相关配置文件的访问顺序如下
 
@@ -939,25 +933,157 @@ struct hlist_node {
 
 ### 14.4.1 completion
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+completion类似C++中的条件变量condition_variable，基于轻量级的 waitqueue (swait_queue) 实现。swait_queue 常用于只允许单个进程等待的轻量级同步场景。这个结构通常是栈上的局部变量（不像 wait_queue 那样支持多个等待者），用于表示当前进程正在某个 swait_queue_head 上等待。
 
-### 14.4.2 waitqueue
+```c
+/* include/linux/completion.h */
+struct completion {
+    unsigned int            done; /* 同步标记，>0表示有事件通知，=UINT_MAX表示通知所有事件 */
+    struct swait_queue_head wait; /* 等待事件队列，用了更轻量级的simple waitqueues */
+};
+```
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+completion 对外暴露成对的接口：等待和唤醒。
+
+#### 14.4.1.1 唤醒
+
+唤醒分为普通唤醒和全部唤醒。
+
+两者都会修改done字段的值，不同之处是普通唤醒是 `done++`：[complete()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/completion.c#L35) ，而全部唤醒是将done赋值为 UINT_MAX：[complete_all()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/completion.c#L64) 。修改完done的值后，调用相应的 swake_up_xx() 函数唤醒等待的进程。
+
+swake_up_xx() 函数实现很直接，遍历链表拿到每一个进程（实际只有一个），调用 wake_up_process() 唤醒，并将该进程从链表中删除：[swake_up_locked()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/swait.c#L21) 
+
+#### 14.4.1.2 等待
+
+等待过程比较直观：将当前进程加入到 wait 指向的队列中，修改当前进程状态，调用 schedule() 让出CPU。待进程被唤醒，检查done字段是否非0（避免误唤醒），如果非0，说明等待条件成熟，done-- 后返回即可： [do_wait_for_common()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/completion.c#L71) 
+
+等待还有一种类型是超时等待，即超时一定时间条件未成熟也强制唤醒。实现上就是多了一个定时器：[schedule_timeout()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L1933) ，待超时后将进程强制唤醒：[process_timeout()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L1862) 
+
+#### 14.4.1.3 为什么有swake_up_all() 
+
+既然 swait_queue 只允许单个进程等待，为什么会有swake_up_all()这种函数呢？ChatGPT给的答案如下：
+
+| 原因         | 解释                                                         |
+| ------------ | ------------------------------------------------------------ |
+| ✅ API 对称性 | 保持和标准 `wake_up` 接口一致                                |
+| ✅ 容错性     | 如果不小心有多个任务等待，仍可唤醒                           |
+| ✅ 实际效果   | 虽然通常只有一个等待者，`swake_up_all` 仍会遍历整个链表      |
+| ⚠️ 使用建议   | 大多数场景下用 `swake_up()`，`swake_up_all()` 仅用于防御或调试目的 |
+
+### 14.4.2 wait_queue
+
+-   [Linux等待队列（Wait Queue）](https://hughesxu.github.io/posts/Linux_Wait_Queue/) 
+
+wait_queue的实现思路和simple wait_queue差不太多，在实现细节上更复杂，能做到的控制更精细。如果你在做复杂的设备驱动开发、需要高级控制，比如多个等待队列共享、精细调度等，使用 wait_queue 是更合适的。如果只是等待一个条件变为 true 或一个事件发生，使用 simple wait_event 是更简洁、安全的方式。
+
+```c
+/* include/linux/wait.h */
+struct wait_queue_entry {
+    unsigned int      flags;    /* 队列元素状态和属性 */
+    void              *private; /* 指向关联进程 task_struct 结构体的指针 */
+    wait_queue_func_t func;     /* 等待队列被唤醒时的回调的唤醒函数 */
+    struct list_head  entry;
+};
+
+struct wait_queue_head {
+    spinlock_t        lock;
+    struct list_head  head;
+};
+```
+
+![](https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97%E7%BB%93%E6%9E%84.svg)
 
 ### 14.4.3 workqueue
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+workqueue 类似 C++ 中的线程池，通过异步的方式推后一个函数的执行。这个函数具体什么时候执行，依赖于**内核的进程调度**。
+
+```c
+/* include/linux/workqueue.h */
+struct work_struct {
+    atomic_long_t    data;
+    struct list_head entry;
+    work_func_t      func;
+};
+
+/* kernel/workqueue.c */
+struct workqueue_struct {
+    struct list_head pwqs;       /* WR: all pwqs of this wq */
+    struct list_head list;       /* PR: list of all workqueues */
+
+    struct mutex     mutex;      /* protects this wq */
+    ...
+}
+```
 
 ### 14.4.4 tasklet
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+tasklet 也是通过异步的方式推后一个函数的执行，但它的原理不是基于进程调度，而是基于软中断上下文，不能睡眠。
+
+```c
+/* include/linux/interrupt.h */
+struct tasklet_struct
+{
+    struct tasklet_struct *next;
+    unsigned long state;
+    atomic_t count;
+    bool use_callback;
+    union {
+        void (*func)(unsigned long data);
+        void (*callback)(struct tasklet_struct *t);
+    };
+    unsigned long data;
+};
+```
 
 ### 14.4.5 timer
 
-<span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
+-   [带你走进linux 内核 定时器（timer）实现机制](https://zhuanlan.zhihu.com/p/544432546) 
 
-# 15 参考章节
+一个定时器是使用 `struct timer_list` 结构体来表示的，对于系统中的成千上万个定时器，通过称作时间轮（Timer Wheel）的结构来高效管理，这个结构用 `struct timer_base` 结构体来表示。
+
+```c
+/* kernel/time/timer.c */
+struct timer_base {
+    raw_spinlock_t    lock;               /* 保护该结构体的自旋锁 */
+    struct timer_list *running_timer;     /* 当前CPU正在处理的定时器所对应的timer_list结构 */
+    unsigned long     clk;                /* 当前定时器所经过的 jiffies，用来判断包含的定时器是否已经到期或超时 */
+    unsigned long     next_expiry;        /* 该CPU下一个即将到期的定时器 */
+    unsigned int      cpu;                /* 所属的CPU号 */
+    bool              next_expiry_recalc;
+    bool              is_idle;            /* 是否处于空闲模式下 */
+    bool              timers_pending;
+    DECLARE_BITMAP(pending_map, WHEEL_SIZE);
+    struct hlist_head vectors[WHEEL_SIZE];/* WHEEL_SIZE = 9 * 64 = 576 */
+} ____cacheline_aligned;
+```
+
+<img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
+
+#### 14.4.5.1 确定time_list对应的桶
+
+[calc_wheel_index()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L533) 函数通过计算离到期 jiffies 的长短，决定定时器放置到哪个桶下，每个桶的粒度（精度）是不同的。
+
+| Level | offset | 粒度           | 差值范围                |
+| ----- | ------ | -------------- | ----------------------- |
+| 0     | 0      | 1 Tick         | [0, 63]                 |
+| 1     | 64     | 8 Ticks        | [64, 511]               |
+| 2     | 128    | 64 Ticks       | [512, 4096]             |
+| 3     | 192    | 512 Ticks      | [4096, 32767]           |
+| 4     | 256    | 4096 Ticks     | [32768, 262143]         |
+| 5     | 320    | 32768 Ticks    | [262144, 2097151]       |
+| 6     | 384    | 262144 Ticks   | [2097152, 16777215]     |
+| 7     | 448    | 2097152 Ticks  | [16777216, 134217727]   |
+| 8     | 512    | 16777216 Ticks | [134217728, 1073741822] |
+
+#### 14.4.5.2 time_list加入到对应的桶
+
+ [enqueue_timer()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L601) 函数会将定时器放到 timer_base 的某个桶中。
+
+#### 14.4.5.3 时钟中断处理
+
+时钟中断触发时，[tick_periodic()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/tick-common.c#L85) 函数会执行具体的工作。主要的函数调用流：`update_process_times() -> run_local_timers() -> raise_softirq(TIMER_SOFTIRQ) -> run_timer_softirq()`。更详细的关系，可以在自己设置的定时器的回调函数中通过`dump_stack()` 打印出来。
+
+# 15 Reference 
 
 ## 15.1 手册
 
