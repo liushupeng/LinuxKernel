@@ -11,48 +11,48 @@ bool             dev_succ = false;
 dev_t            dev_num  = 0;        /* device number */
 struct cdev      cdev;                /* char device */
 struct class*    dev_class    = NULL; /* device class */
-const char*      DEVICE_NAME  = "interrupt";
+const char*      DEVICE_NAME  = "parallel";
 struct resource* dev_resource = NULL;
 
-int           irq            = -1;
-unsigned long interrupt_base = 0x378;
-DECLARE_WAIT_QUEUE_HEAD(interrupt_wq);
+int           irq           = -1;
+unsigned long parallel_base = 0x378;
+DECLARE_WAIT_QUEUE_HEAD(parallel_wq);
 
 /*  |buffer      |tail                     |head
  *  ----------------------------------------------------------------
  *  |                          PAGE                                |
  *  ----------------------------------------------------------------
  */
-unsigned long          interrupt_buffer = 0;
-volatile unsigned long interrupt_head   = 0;
-volatile unsigned long interrupt_tail   = 0;
+unsigned long          parallel_buffer = 0;
+volatile unsigned long parallel_head   = 0;
+volatile unsigned long parallel_tail   = 0;
 
 MODULE_AUTHOR("Liu ShuPeng");
 MODULE_LICENSE("Dual BSD/GPL");
 
-#define DISABLE_INTERRUPT() outb(0x00, interrupt_base)
-#define ENABLE_INTERRUPT() outb(0x10, interrupt_base)
+#define DISABLE_INTERRUPT() outb(0x00, parallel_base)
+#define ENABLE_INTERRUPT() outb(0x10, parallel_base)
 
-static inline void interrupt_increment_index(volatile unsigned long* index, int delta)
+static inline void parallel_increment_index(volatile unsigned long* index, int delta)
 {
     unsigned long new = *index + delta;
     barrier(); /* Don't optimize these two together */
-    *index = (new >= (interrupt_buffer + PAGE_SIZE)) ? interrupt_buffer : new;
+    *index = (new >= (parallel_buffer + PAGE_SIZE)) ? parallel_buffer : new;
 }
 
-int interrupt_open(struct inode* inode, struct file* filp)
+int parallel_open(struct inode* inode, struct file* filp)
 {
     pr_info("Enter open() ...\n");
     return 0;
 }
 
-int interrupt_release(struct inode* inode, struct file* filp)
+int parallel_release(struct inode* inode, struct file* filp)
 {
     pr_info("Enter close() ...\n");
     return 0;
 }
 
-ssize_t interrupt_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
+ssize_t parallel_read(struct file* filp, char __user* buf, size_t count, loff_t* f_pos)
 {
     int     len;
     ssize_t result;
@@ -60,32 +60,32 @@ ssize_t interrupt_read(struct file* filp, char __user* buf, size_t count, loff_t
 
     pr_info("Enter read() ...\n");
 
-    while (interrupt_head == interrupt_tail) {
-        prepare_to_wait(&interrupt_wq, &wait, TASK_INTERRUPTIBLE);
-        if (interrupt_head == interrupt_tail) {
+    while (parallel_head == parallel_tail) {
+        prepare_to_wait(&parallel_wq, &wait, TASK_INTERRUPTIBLE);
+        if (parallel_head == parallel_tail) {
             schedule();
         }
-        finish_wait(&interrupt_wq, &wait);
+        finish_wait(&parallel_wq, &wait);
         if (signal_pending(current)) {
             return -ERESTARTSYS;
         }
     }
 
-    len = interrupt_head - interrupt_tail;
+    len = parallel_head - parallel_tail;
     if (len < 0) {
-        len = interrupt_buffer + PAGE_SIZE - interrupt_tail;
+        len = parallel_buffer + PAGE_SIZE - parallel_tail;
     }
     if (len < count) {
         count = len;
     }
 
-    result = copy_to_user(buf, (char*)interrupt_tail, count);
+    result = copy_to_user(buf, (char*)parallel_tail, count);
     if (result != 0) {
         pr_err("Failed to copy data to user spacei, still %lu bytes not copied\n", result);
         return -EFAULT;
     }
     *f_pos += count;
-    interrupt_increment_index(&interrupt_tail, count);
+    parallel_increment_index(&parallel_tail, count);
 
     /*
     pr_info("Dumping stack trace:\n");
@@ -95,7 +95,7 @@ ssize_t interrupt_read(struct file* filp, char __user* buf, size_t count, loff_t
     return count;
 }
 
-ssize_t interrupt_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
+ssize_t parallel_write(struct file* filp, const char __user* buf, size_t count, loff_t* f_pos)
 {
     ssize_t i, result;
     char    buffer[128];
@@ -120,29 +120,29 @@ ssize_t interrupt_write(struct file* filp, const char __user* buf, size_t count,
 
     /* 8 bit write */
     for (i = 0; i < count; i++) {
-        outb(buffer[i], interrupt_base);
+        outb(buffer[i], parallel_base);
         wmb();
     }
 
     return count;
 }
 
-struct file_operations interrupt_fops = {
+struct file_operations parallel_fops = {
     .owner   = THIS_MODULE,
-    .open    = interrupt_open,
-    .release = interrupt_release,
-    .read    = interrupt_read,
-    .write   = interrupt_write,
+    .open    = parallel_open,
+    .release = parallel_release,
+    .read    = parallel_read,
+    .write   = parallel_write,
 };
 
 #ifdef AUTO_CREATE_DEVICE
-int interrupt_create_device(void)
+int parallel_create_device(void)
 {
     struct device* device;
     /*
      * Create device class
      */
-    dev_class = class_create(THIS_MODULE, "interrupt_class");
+    dev_class = class_create(THIS_MODULE, "parallel_class");
     if (IS_ERR(dev_class)) {
         pr_err("Failed to create class\n");
         return PTR_ERR(dev_class);
@@ -190,7 +190,7 @@ int usermode_create_device(char* major, char* minor, char* device)
     return 0;
 }
 
-int interrupt_create_device(void)
+int parallel_create_device(void)
 {
     int  result;
     char major[32];
@@ -210,7 +210,7 @@ int interrupt_create_device(void)
 }
 #endif
 
-int interrupt_probe_irq(void)
+int parallel_probe_irq(void)
 {
     int count     = 0;
     int probe_irq = -1;
@@ -218,8 +218,8 @@ int interrupt_probe_irq(void)
     do {
         unsigned long mask = probe_irq_on();
 
-        outb_p(0x00, interrupt_base);
-        outb_p(0xFF, interrupt_base);
+        outb_p(0x00, parallel_base);
+        outb_p(0xFF, parallel_base);
         udelay(5);
 
         probe_irq = probe_irq_off(mask);
@@ -236,7 +236,7 @@ int interrupt_probe_irq(void)
     return probe_irq;
 }
 
-irqreturn_t interrupt_callback(int irq, void* dev_id)
+irqreturn_t parallel_callback(int irq, void* dev_id)
 {
     int               written;
     struct timespec64 ts;
@@ -244,24 +244,24 @@ irqreturn_t interrupt_callback(int irq, void* dev_id)
     ktime_get_real_ts64(&ts);
 
     /* Write a 16 byte record. Assume PAGE_SIZE is a multiple of 16 */
-    written = sprintf((char*)interrupt_head,
+    written = sprintf((char*)parallel_head,
                       "%08u.%06u\n",
                       (int)(ts.tv_sec % 100000000),
                       (int)(ts.tv_nsec / 1000));
     BUG_ON(written != 16);
 
-    interrupt_increment_index(&interrupt_head, written);
-    wake_up_interruptible(&interrupt_wq);
+    parallel_increment_index(&parallel_head, written);
+    wake_up_interruptible(&parallel_wq);
 
     return IRQ_HANDLED;
 }
 
 
-int interrupt_request_irq(void)
+int parallel_request_irq(void)
 {
     int result;
 
-    result = request_irq(irq, interrupt_callback, IRQF_NO_THREAD, DEVICE_NAME, NULL);
+    result = request_irq(irq, parallel_callback, IRQF_NO_THREAD, DEVICE_NAME, NULL);
     if (result) {
         pr_err("Can't get assigned irq %i\n", irq);
         irq = -1;
@@ -277,15 +277,15 @@ int interrupt_request_irq(void)
  * Thefore, it must be careful to work correctly even if some of the items
  * have not been initialized
  */
-void interrupt_cleanup(void)
+void parallel_cleanup(void)
 {
     if (irq >= 0) {
         DISABLE_INTERRUPT();
         free_irq(irq, NULL);
     }
 
-    if (interrupt_buffer) {
-        free_page(interrupt_buffer);
+    if (parallel_buffer) {
+        free_page(parallel_buffer);
     }
 
     if (dev_succ) {
@@ -305,11 +305,11 @@ void interrupt_cleanup(void)
     }
 
     if (dev_resource != NULL) {
-        release_region(interrupt_base, 1);
+        release_region(parallel_base, 1);
     }
 }
 
-int interrupt_init(void)
+int parallel_init(void)
 {
     int result;
     memset(&cdev, 0, sizeof(struct cdev));
@@ -317,9 +317,9 @@ int interrupt_init(void)
     /*
      * Get I/O resources.
      */
-    dev_resource = request_region(interrupt_base, 1, DEVICE_NAME);
+    dev_resource = request_region(parallel_base, 1, DEVICE_NAME);
     if (dev_resource == NULL) {
-        pr_err("Can't get I/O port address 0x%lx\n", interrupt_base);
+        pr_err("Can't get I/O port address 0x%lx\n", parallel_base);
         return -EBUSY;
     }
 
@@ -329,14 +329,14 @@ int interrupt_init(void)
     result = alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
     if (result < 0) {
         pr_err("Alloc device number failed, result:%d\n", result);
-        interrupt_cleanup();
+        parallel_cleanup();
         return result;
     }
 
     /*
      * Initialize cdev and bind fops
      */
-    cdev_init(&cdev, &interrupt_fops);
+    cdev_init(&cdev, &parallel_fops);
     cdev.owner = THIS_MODULE;
 
     /*
@@ -345,43 +345,43 @@ int interrupt_init(void)
     result = cdev_add(&cdev, dev_num, 1);
     if (result < 0) {
         pr_err("Add cdev failed, result:%d\n", result);
-        interrupt_cleanup();
+        parallel_cleanup();
         return result;
     }
 
     /*
      * Create device
      */
-    result = interrupt_create_device();
+    result = parallel_create_device();
     if (result < 0) {
         pr_err("Failed to create device, result:%d\n", result);
-        interrupt_cleanup();
+        parallel_cleanup();
         return result;
     }
 
     /*
      * Alloc page buffer
      */
-    interrupt_buffer = __get_free_pages(GFP_KERNEL, 0);
-    interrupt_head = interrupt_tail = interrupt_buffer;
+    parallel_buffer = __get_free_pages(GFP_KERNEL, 0);
+    parallel_head = parallel_tail = parallel_buffer;
 
     /*
      * Probe IRQ
      */
-    irq = interrupt_probe_irq();
+    irq = parallel_probe_irq();
     if (irq < 0) {
         pr_err("Failed to probe irq, result:%d\n", irq);
-        interrupt_cleanup();
+        parallel_cleanup();
         return irq;
     }
 
     /*
      * Request IRQ
      */
-    result = interrupt_request_irq();
+    result = parallel_request_irq();
     if (result < 0) {
         pr_err("Failed to request irq, result:%d\n", result);
-        interrupt_cleanup();
+        parallel_cleanup();
         return result;
     }
 
@@ -389,5 +389,5 @@ int interrupt_init(void)
     return 0;
 }
 
-module_init(interrupt_init);
-module_exit(interrupt_cleanup);
+module_init(parallel_init);
+module_exit(parallel_cleanup);

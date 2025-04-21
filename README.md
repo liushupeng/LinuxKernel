@@ -3,7 +3,6 @@
 - [Linux 内核学习笔记](https://freeflyingsheep.github.io/zh-cn/posts/introduction/) $^{[1]}$ 
 - [Linux内核应该怎么去学习](https://www.zhihu.com/question/58121772) $^{[2]}$ 
 - [怎么搭建学习Linux内核的运行、调试环境](https://www.zhihu.com/question/66594120/answer/245555815) 
-- [Linux内核精通](https://github.com/0voice/linux_kernel_wiki) 
 
 $[1]$ 原作者整理了《深入理解 Linux 内核》、《Linux 内核设计与实现》和《深入 Linux 内核架构》相关章节的内容以及作者个人的理解，里面的内容很有价值。本篇文章也参考了其中部分内容。
 
@@ -11,19 +10,19 @@ $[2]$ 按照这个答案提供的路线：[学习内核功夫在代码之外](ht
 
 # 1 学习路线
 
-1️⃣首先要搭建一个Linux的学习环境：建议使用Qemu虚拟机+装一个标准的Ubuntu Linux，学习简单的Linux使用方法，更重要的是学习编译Linux内核$^{[1]}$ ✅ 
+1️⃣首先要搭建一个Linux的学习环境：建议使用Qemu虚拟机+装一个标准的Ubuntu Linux，学习简单的Linux使用方法，更重要的是学习编译Linux内核 $^{[1]}$ ✅ 
 
-2️⃣从《LINUX设备驱动程序》这本书入手，掌握编写标准的虚拟字符驱动方法，并亲自动写一个，验证通过$^{[2]}$ ✅ 
+2️⃣从《LINUX设备驱动程序》这本书入手，掌握编写标准的虚拟字符驱动方法，并亲自动写一个，验证通过 $^{[2]}$ ✅ 
 
 3️⃣在基于2️⃣的代码里，对于open/write钩子调用backtrace函数输出驱动file_operations钩子函数的执行上下文，并根据backtrace调用栈，看每个函数长什么样，如果能分析到这些函数属于那个功能模块(比如syscall,vfs,device)就更好了 ✅ 
 
 4️⃣再从通用的、基础的功能模块开始学起，比如系统调用原理，中断处理 ✅ 
 
-5️⃣学习第4️⃣点任何知识时，建议找相关的参考书帮自己梳理知识脉络，更重的是动手修改代码验证自己的理解。比如新增一个系统调用，注册一个中断处理函数，看看执行起来是什么样子的。$^{[3]}$✅ 
+5️⃣学习第4️⃣点任何知识时，建议找相关的参考书帮自己梳理知识脉络，更重的是动手修改代码验证自己的理解。比如新增一个系统调用，注册一个中断处理函数，看看执行起来是什么样子的 $^{[3]}$ ✅ 
 
 6️⃣经过第5️⃣阶段的学习，可以系统学习某些大功能模块的机理了，比如虚拟内存、CFS调度算法、PageCache管理，某个文件系统(比如ext2)，网络协议栈等。❌
 
-7️⃣学会使用kernel的调试工具，比如Qemu+gdb调用内核，还有内核自身提供的ftrace,perf等功能都是很好的测量和分析工具 ✅ 
+7️⃣学会使用kernel的调试工具，比如Qemu+gdb调用内核，还有内核自身提供的 ftrace, perf 等功能都是很好的测量和分析工具 ✅ 
 
 ------
 
@@ -120,10 +119,7 @@ CONFIG_TCP_CONG_BBR=y
 CONFIG_NET_SCH_FQ_CODEL=y
 CONFIG_NET_SCH_FQ=y
 
-CONFIG_PARPORT=y
-CONFIG_PARPORT_PC=y
-CONFIG_PPDEV=y
-CONFIG_PRINTER=y
+CONFIG_IA32_EMULATION=y
 ```
 
 ### 2.2.3 生成 .config
@@ -495,7 +491,20 @@ $ echo -n "any string" > /dev/ioport
 
 # 6 中断处理
 
-什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的事件（event）。为解决中断响应时间长的问题，Linux将中断处理例程分成两部分：顶半部和底半部。
+-   [Linux 中断（IRQ/softirq）基础：原理及内核实现](https://arthurchiao.art/blog/linux-irq-softirq-zh/) 
+
+什么是中断？中断就是当软件或者硬件需要使用 CPU 时引发的事件（event），可以将中断想象成硬件或软件产生（或“触发”）的事件。
+
+-   硬件中断是由硬件设备触发的，以此通知内核发生了特定的事件。一个常见的例子是网卡收到数据包时触发的硬中断。
+-   软件中断是由执行中的程序触发的。在 x86-64 系统上，软件中断可以通过 **`int`** 指令触发。
+
+>   ？？中断编号，中断项
+>
+>   ？？ int 0x80 中的entry_INT80_compat() 函数是如何被调用的？
+
+## 6.1 顶半部和底半部
+
+为解决中断响应时间长的问题，Linux将中断处理例程分成两部分：顶半部和底半部。
 
 **顶半部**：是实际响应中断的例程，也就是用 request_irq 注册的中断例程
 
@@ -503,48 +512,188 @@ $ echo -n "any string" > /dev/ioport
 
 顶半部处理例程和底半部处理例程之间最大的不同，就是当底半部处理例程执行时，所有的中断都是打开的——这就是所谓的在更安全时间内运行。典型的情况是顶半部保存设备的数据到一个设备特定的缓冲区并调度它的底半部，然后退出，这个操作是非常快的。然后，底半部执行其他必要的工作，例如唤醒进程、启动另外的I/O操作等等。这种方式允许在底半部工作期间，顶半部还可以继续为新的中断服务。
 
-顶半部和底半部一般通过tasklet或workqueue来实现。关于这两者的实现可以移步 `12.3` 章节。一个中断处理的实现：[interrupt/interrupt.c](https://github.com/liushupeng/LinuxKernel/blob/master/interrupt/interrupt.c) 
+顶半部和底半部一般通过tasklet或workqueue来实现。关于这两者的实现可以移步 `12.3` 章节。一个中断处理的实现：[interrupt/parallel_hardirq.c](https://github.com/liushupeng/LinuxKernel/blob/master/interrupt/parallel_hardirq.c) 
 
 # 7 系统调用
 
-[Linux内核揭秘——系统调用](https://docs.hust.openatom.club/linux-insides-zh/syscall) 
+-   [[译] Linux 系统调用权威指南](https://arthurchiao.art/blog/system-call-definitive-guide-zh/) 
 
-## 7.1 entry_SYSCALL_64_after_hwframe
+系统调用是一种程序进入内核执行任务的方式。程序利用系统调用进行一系列操作，例如创建进程、处理网络、读写文件等等。
 
-`entry_SYSCALL_64_after_hwframe` 是 64 位系统调用处理的关键部分。
+## 7.1 传统系统调用
 
-```assembly
-# arch/x86/entry/entry_64.S
+Linux 内核预留了一个特殊的软中断号 `128(0x80)`， 用户空间程序使用`int 0x80;`可以进入内核执行系统调用，这个过程就是传统系统调用。我们用汇编语言模拟了 read() 操作触发 0x80 软中断的过程，来学习内核中传统系统调用的实现：[syscall/read_int80.c](https://github.com/liushupeng/LinuxKernel/blob/master/syscall/read_int80.c)  
+
+由于 Linux 6.1 内核默认用的快速系统调用，传统系统调用只在 32-bit 系统下兼容，所以需要对环境做一些修改：
+
+```bash
+# 配置内核支持运行 32-bit 程序，并重新编译内核
+CONFIG_IA32_EMULATION=y
+
+# 需要 glibc 支持 32-bit 编译
+$ sudo apt install gcc-multilib g++-multilib
+```
+
+编译源码时需要额外的 `-m32` 和 `-static` 参数，并安装之前章节的basicdevice便于做back trace
+
+```bash
+$ gcc -m32 -static read_int80.c -o read_int80  # -m指定32位编译，-static表示不依赖动态库
+$ insmod basicdevice.ko                        # 便于查看函数调用栈
+$ ./read_int80
+```
+
+### 7.1.1 entry_INT80_compat
+
+`arch/x86/entry/entry_64_compat.S:entry_INT80_compat()` 是 Linux 内核中用于处理 32 位兼容模式下 `int 0x80` 系统调用的入口函数，主要用于在 64 位内核中支持 32 位用户空间程序的系统调用。
+
+```asm
+SYM_CODE_START(entry_INT80_compat)
+    UNWIND_HINT_ENTRY
+    ENDBR
+
+    ASM_CLAC                                              ; 防止 ROP 攻击
+    ALTERNATIVE "swapgs", "", X86_FEATURE_XENPV           ; 防止用户态异常影响内核
+
+    movl    %eax, %eax                                    ; 清除调用号高32位（兼容 64 位清零）
+
+    pushq   %rax                                          ; 系统调用号eax压栈，保存在 pt_regs->orig_ax
+
+    SWITCH_TO_KERNEL_CR3 scratch_reg=%rax                 ; 切换到内核页表（Kernel CR3），防止用户地址泄露
+
+    movq    %rsp, %rax                                    ; 暂存当前 rsp
+    movq    PER_CPU_VAR(cpu_current_top_of_stack), %rsp   ; 切换栈指针到当前 CPU 的内核栈顶
+    ; 将原来的栈顶（用户栈）上的值按顺序压入新的内核栈
+    pushq   5*8(%rax)                                     ; regs->ss
+    pushq   4*8(%rax)                                     ; regs->rsp
+    pushq   3*8(%rax)                                     ; regs->eflags
+    pushq   2*8(%rax)                                     ; regs->cs
+    pushq   1*8(%rax)                                     ; regs->ip
+    pushq   0*8(%rax)                                     ; regs->orig_ax
+.Lint80_keep_stack:
+
+    PUSH_AND_CLEAR_REGS rax=$-ENOSYS                      ; 保存剩下的通用寄存器到 pt_regs，设置默认返回值-ENOSYS
+    UNWIND_HINT_REGS
+
+    cld                                                   ; 清除方向标志
+
+    IBRS_ENTER
+    UNTRAIN_RET                                           ; 清除分支预测状态，防止推测执行攻击
+
+    movq    %rsp, %rdi                                    ; 将 pt_regs 地址传入 RDI
+    call    do_int80_syscall_32                           ; 核心函数
+    jmp swapgs_restore_regs_and_return_to_usermode        ; 恢复用户态上下文，并执行 iret 返回用户空间
+SYM_CODE_END(entry_INT80_compat)
+```
+
+### 7.1.2 do_int80_syscall_32
+
+`arch/x86/entry/common.c:do_int80_syscall_32()`接收从用户态进入内核后构造的 `pt_regs`，处理一个 32 位的系统调用，并最终返回用户态。
+
+```c
+__visible noinstr void do_int80_syscall_32(struct pt_regs *regs)
+{
+    int nr = syscall_32_enter(regs);              // 从regs->orig_ax获取系统调用号并做合法性检查
+    add_random_kstack_offset();                   // 随机偏移量到当前内核栈，增强安全性
+
+    nr = syscall_enter_from_user_mode(regs, nr);  // 再次确认 nr 的合法性
+    instrumentation_begin();
+
+    do_syscall_32_irqs_on(regs, nr);              // 核心函数
+
+    instrumentation_end();
+    syscall_exit_to_user_mode(regs);
+}
+```
+
+### 7.1.3 do_syscall_32_irqs_on
+
+`arch/x86/entry/common.c:do_syscall_32_irqs_on()`执行指定的 32 位系统调用号 `nr`，将返回值写入 `regs->ax`（相当于 `EAX`，用户态接收返回值的寄存器）
+
+```c
+static __always_inline void do_syscall_32_irqs_on(struct pt_regs *regs, int nr)
+{
+    unsigned int unr = nr;   // 转为无符号整数，如果输入的nr为负数，unr会变成很大的数
+
+    if (likely(unr < IA32_NR_syscalls)) {
+        unr = array_index_nospec(unr, IA32_NR_syscalls); // 确保 unr 作为数组下标时访问安全
+        regs->ax = ia32_sys_call_table[unr](regs); // 系统调用表ia32_sys_call_table查表调用，返回值赋给regs->ax
+    } else if (nr != -1) {
+        regs->ax = __ia32_sys_ni_syscall(regs);    // 输入的nr非法，调用"not implemented"系统调用，返回 -ENOSYS
+    }
+}
+```
+
+### 7.1.4 ia32_sys_call_table
+
+`arch/x86/entry/syscall_32.c:ia32_sys_call_table[]` 包含了所有的系统调用。
+
+```c
+__visible const sys_call_ptr_t ia32_sys_call_table[] = {
+#include <asm/syscalls_32.h>
+};
+```
+
+具体的内容包含在 `arch/x86/include/generated/asm/syscalls_32.h` 文件中，这个文件是在内核编译期间产出的，相关内容摘取部分如下
+
+```c
+__SYSCALL(0, sys_restart_syscall)
+__SYSCALL(1, sys_exit)
+__SYSCALL(2, sys_fork)
+__SYSCALL(3, sys_read)
+__SYSCALL(4, sys_write)
+__SYSCALL_WITH_COMPAT(5, sys_open, compat_sys_open)
+__SYSCALL(6, sys_close)
+__SYSCALL(7, sys_waitpid)
+__SYSCALL(8, sys_creat)
+__SYSCALL(9, sys_link)
+__SYSCALL(10, sys_unlink)
+...
+```
+
+### 7.1.5  sys_read
+
+后续部分和 `7.2.4 sys_read` 完全一样，此处不再赘述。
+
+## 7.2 快速系统调用
+
+相较于传统系统调用，快速系统调用不需要软中断，因此更快。快速系统调用提供了两个指令：一个进入内核的指令和一个离开内核的指令。
+
+>   在 32bit 系统上：使用 `sysenter` 和 `sysexit`。在 64bit 系统上：使用 `syscall` 和 `sysret`
+
+以 Linux 6.1内核中一个read()系统调用，来观察64 位系统的快速系统调用的工作原理。
+
+### 7.2.1 entry_SYSCALL_64_after_hwframe
+
+`arch/x86/entry/entry_64.S:entry_SYSCALL_64_after_hwframe()` 是 64 位系统调用处理的关键部分。
+
+```asm
 SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
-    pushq   %rax        # rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax
+    pushq   %rax        ; rax寄存器存储着系统调用号，压入栈中，最终会存到 pt_regs->orig_ax
 
-    PUSH_AND_CLEAR_REGS rax=$-ENOSYS  # 设置默认返回值 -ENOSYS
+    PUSH_AND_CLEAR_REGS rax=$-ENOSYS  ; 设置默认返回值 -ENOSYS
 
-    # IRQs are off
+    ; IRQs are off
     movq    %rsp, %rdi
-    # Sign extend the lower 32bit as syscall numbers are treated as int
+    ; Sign extend the lower 32bit as syscall numbers are treated as int
     movslq  %eax, %rsi
 
-    # clobbers %rax, make sure it is after saving the syscall nr
+    ; clobbers %rax, make sure it is after saving the syscall nr
     IBRS_ENTER
     UNTRAIN_RET
 
-    call    do_syscall_64             # returns with IRQs disabled
+    call    do_syscall_64             ; returns with IRQs disabled
 
     ...
 ```
 
-## 7.2 do_syscall_64
+### 7.2.2 do_syscall_64
 
- `do_syscall_64`是 64 位系统调用的核心调度函数，负责根据系统调用号 `nr` 调用相应的 `x86_64` 或 `x32` 系统调用处理函数，并在用户态与内核态转换时进行必要的安全和调试处理。
+ `arch/x86/entry/common.c:do_syscall_64`是 64 位系统调用的核心调度函数，负责根据系统调用号 `nr` 调用相应的 `x86_64` 或 `x32` 系统调用处理函数，并在用户态与内核态转换时进行必要的安全和调试处理。
 
 ```c
-// arch/x86/entry/common.c
-/**
- * regs - struct pt_regs * : 指向保存用户态寄存器状态的结构体
- * nr - int : 系统调用号，由 RAX 传入
- */
-__visible noinstr void do_syscall_64(struct pt_regs *regs, int nr)
+__visible noinstr void do_syscall_64(
+    struct pt_regs *regs, /* 指向保存用户态寄存器状态的结构体 */
+    int nr)               /* 系统调用号，由 RAX 传入 */
 {
     add_random_kstack_offset();	// 随机偏移，打乱栈地址，攻击者无法精准预测内核栈布局
     nr = syscall_enter_from_user_mode(regs, nr);
@@ -558,12 +707,11 @@ __visible noinstr void do_syscall_64(struct pt_regs *regs, int nr)
 }
 ```
 
-## 7.3 do_syscall_x64
+### 7.2.3 do_syscall_x64
 
-`do_syscall_x64`的核心是通过nr从sys_call_table中找到对应的系统调用，sys_call_table的具体内容存储在 arch/x86/include/generated/asm/syscalls_64.h 文件中。对用户态的read()操作，对应着内核态的sys_read()
+`arch/x86/entry/common.c:do_syscall_x64`的核心是通过nr从sys_call_table中找到对应的系统调用，对用户态的read()操作，对应着内核态的sys_read()
 
 ```c
-// arch/x86/entry/common.c
 static __always_inline bool do_syscall_x64(struct pt_regs *regs, int nr)
 {
     unsigned int unr = nr;
@@ -577,9 +725,26 @@ static __always_inline bool do_syscall_x64(struct pt_regs *regs, int nr)
 }
 ```
 
-### 7.3.1 SYSCALL_DEFINE3(read,...)
+sys_call_table的具体内容存储在 arch/x86/include/generated/asm/syscalls_64.h 文件中。部分内容摘取如下：
 
-从代码的跳转来看，`sys_read()`函数直接就进入了 `SYSCALL_DEFINE3(read,)` 函数，这是为什么呢？因为`SYSCALL_DEFINE3(read,)`这个宏展开后就是`sys_read()`，它俩是一个东西。
+```c
+__SYSCALL(0, sys_read)
+__SYSCALL(1, sys_write)
+__SYSCALL(2, sys_open)
+__SYSCALL(3, sys_close)
+__SYSCALL(4, sys_newstat)
+__SYSCALL(5, sys_newfstat)
+__SYSCALL(6, sys_newlstat)
+__SYSCALL(7, sys_poll)
+__SYSCALL(8, sys_lseek)
+__SYSCALL(9, sys_mmap)
+__SYSCALL(10, sys_mprotect)
+...
+```
+
+### 7.2.4 sys_read
+
+从代码的跳转来看，`sys_read()`函数直接就进入了 `fs/read_write.c:SYSCALL_DEFINE3(read,...)` 函数，这是为什么呢？因为`SYSCALL_DEFINE3(read,)`这个宏展开后就是`sys_read()`，它俩是一个东西。
 
 ```c
 // include/linux/syscalls.h
@@ -594,7 +759,7 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 asmlinkage long sys_read(unsigned int fd, char __user *buf, size_t count)
 ```
 
-## 7.4 ksys_read
+### 7.2.5 ksys_read
 
 ```c
 // fs/read_write.c
@@ -618,7 +783,7 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
 }
 ```
 
-## 7.5 vfs_read
+### 7.2.6 vfs_read
 
 vfs_read()实现很简单，此处需要重点说明一下  `file->f_op->read` 是如何和cdev_init()时指定的` struct file_operations *` 关联的。
 
@@ -667,6 +832,15 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 }
 ```
 
+## 7.3 系统调用实现源码
+
+如何查看不同的系统调用对应的源码？下面以 `ptrace` 这个系统调用，描述一下在 Linux 6.1内核下找对应实现的步骤
+
+1.  内核中每个系统调用函数的名称前缀都是 `sys_`，因此 `ptrace` 对应的函数名 `sys_ptrace`
+2.  如果要查找系统调用对应的调用号，在 `arch/x86/include/generated/asm/syscalls_64.h` 文件中查找  `sys_ptrace` 关键字
+3.  如果要查找系统调用的函数定义，在 [`include/linux/syscalls.h`](https://elixir.bootlin.com/linux/v6.1/source/include/linux/syscalls.h#L689)  文件中查找 `sys_ptrace` 关键字，可以看到参数个数是4个
+4.  源码全局查找 `SYSCALL_DEFINE4(ptrace,` 关键字的实现位置 [`kernel/ptrace.c`](https://elixir.bootlin.com/linux/v6.1/source/kernel/ptrace.c#L1269)，就是系统调用的的实现。`SYSCALL_DEFINE4`中的`4`要和参数个数保持一致。
+
 # 8 进程管理
 
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
@@ -684,6 +858,8 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 <span style="background-color: green; color: white; padding: 5px; border-radius: 5px;">✅ TODO</span> 
 
 # 12 时间管理
+
+-   [Linux 时钟源之 TSC：软硬件原理、使用场景、已知问题](https://arthurchiao.art/blog/linux-clock-source-tsc-zh/) 
 
 时间管理主要分为三个部分：延迟、定时器、队列。这其中有两个比较基础的变量：节拍频率 `HZ` 和系统启动以来产生的节拍的总数 `jiffies`，讨论时间相关内容都无法脱离这两个变量。
 
