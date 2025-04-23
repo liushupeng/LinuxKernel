@@ -18,22 +18,23 @@ int           irq           = -1;
 unsigned long parallel_base = 0x378;
 DECLARE_WAIT_QUEUE_HEAD(parallel_wq);
 
-/*  |buffer      |tail                     |head
- *  ----------------------------------------------------------------
- *  |                          PAGE                                |
- *  ----------------------------------------------------------------
+/*  Memory Layout:
+ *    |buffer      |tail                     |head
+ *    ----------------------------------------------------------------
+ *    |                          PAGE                                |
+ *    ----------------------------------------------------------------
  */
 unsigned long          parallel_buffer = 0;
 volatile unsigned long parallel_head   = 0;
 volatile unsigned long parallel_tail   = 0;
 
-MODULE_AUTHOR("Liu ShuPeng");
-MODULE_LICENSE("Dual BSD/GPL");
-
 #define DISABLE_INTERRUPT() outb(0x00, parallel_base)
 #define ENABLE_INTERRUPT() outb(0x10, parallel_base)
 
-static inline void parallel_increment_index(volatile unsigned long* index, int delta)
+MODULE_AUTHOR("Liu ShuPeng");
+MODULE_LICENSE("Dual BSD/GPL");
+
+static void parallel_increment_index(volatile unsigned long* index, int delta)
 {
     unsigned long new = *index + delta;
     barrier(); /* Don't optimize these two together */
@@ -86,11 +87,6 @@ ssize_t parallel_read(struct file* filp, char __user* buf, size_t count, loff_t*
     }
     *f_pos += count;
     parallel_increment_index(&parallel_tail, count);
-
-    /*
-    pr_info("Dumping stack trace:\n");
-    dump_stack();
-    */
 
     return count;
 }
