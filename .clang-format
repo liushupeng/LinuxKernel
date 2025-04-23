@@ -1,5 +1,4 @@
 # https://clang.llvm.org/docs/ClangFormatStyleOptions.html
-# https://www.bbsmax.com/A/VGzlMjexJb/
 
 # 语言: None, Cpp, Java, JavaScript, ObjC, Proto, TableGen, TextProto
 Language: Cpp
