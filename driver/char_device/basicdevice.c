@@ -1,6 +1,7 @@
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define pr_fmt(fmt) "%s:%s:%d:%s() " fmt, KBUILD_MODNAME, FILENAME, __LINE__, __func__
 
+#include "common.h"
 #include <linux/cdev.h>
 #include <linux/fs.h>
 
@@ -115,47 +116,11 @@ int basicdevice_create_device(void)
     return 0;
 }
 #else
-int usermode_create_device(char* major, char* minor, char* device)
-{
-    int  i, s, result;
-    char command[128];
-
-    char* envp[3]  = {"HOME=/", "PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL};
-    char* mknod[6] = {"/bin/mknod", device, "c", major, minor, NULL};
-    char* chmod[4] = {"/bin/chmod", "664", device, NULL};
-
-    result = call_usermodehelper(mknod[0], mknod, envp, UMH_WAIT_EXEC);
-    if (result != 0) {
-        for (i = 0, s = 0; i < sizeof(mknod) / sizeof(mknod[0]); i++) {
-            s = scnprintf(command + s, sizeof(command) - s, "%s ", mknod[i]);
-        }
-        pr_err("Failed to run: %s\n", command);
-        return result;
-    }
-
-    result = call_usermodehelper(chmod[0], chmod, envp, UMH_WAIT_EXEC);
-    if (result != 0) {
-        for (i = 0, s = 0; i < sizeof(chmod) / sizeof(chmod[0]); i++) {
-            s = scnprintf(command + s, sizeof(command) - s, "%s ", chmod[i]);
-        }
-        pr_err("Failed to run: %s\n", command);
-        return result;
-    }
-    return 0;
-}
-
 int basicdevice_create_device(void)
 {
     int  result;
-    char major[32];
-    char minor[32];
-    char device[32];
 
-    scnprintf(major, sizeof(major), "%d", MAJOR(dev_num));
-    scnprintf(minor, sizeof(minor), "%d", MINOR(dev_num));
-    scnprintf(device, sizeof(device), "/dev/%s", DEVICE_NAME);
-
-    result = usermode_create_device(major, minor, device);
+    result = create_device(dev_num, DEVICE_NAME);
     if (result != 0) {
         pr_err("User mode create device failed: %d\n", result);
     }

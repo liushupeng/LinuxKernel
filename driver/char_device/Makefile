@@ -24,6 +24,7 @@ clean:
 .PHONY: modules modules_install clean
 
 else
+	ccflags-y += -I$(shell dirname $(shell dirname $(PWD)))/include
     # called from kernel build system: just declare what our modules are
     obj-m := basicdevice.o
 endif
