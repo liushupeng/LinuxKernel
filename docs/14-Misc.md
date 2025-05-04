@@ -1,8 +1,6 @@
-# Misc
+# 1 代码目录
 
-## 1.1 代码目录
-
-### 1.1.1 kernel/configs
+## 1.1 kernel/configs
 
 存放的是 **预定义的内核配置片段文件**（通常以 `.config` 结尾），这些文件用于快速启用特定功能或适配特定场景的配置选项。典型的文件可能包括：
 
@@ -12,7 +10,7 @@
 - `debug.config` → 调试内核时的常用选项（如 `CONFIG_DEBUG_KERNEL=y`）
 - `tiny.config` → 最小化内核配置（适用于嵌入式设备）
 
-#### 1.1.1.1 kernel/configs/kvm_guest.config 
+### 1.1.1 kernel/configs/kvm_guest.config 
 
 ```bash
 ...
@@ -29,7 +27,7 @@ CONFIG_VIRTIO_NET=y        # 启用 VirtIO 网络设备，提供高效的网络�
 ...
 ```
 
-#### 1.1.1.2 kernel/configs/study.config
+### 1.1.2 kernel/configs/study.config
 
 一些适合自己学习的选项
 
@@ -65,9 +63,9 @@ CONFIG_NET_SCH_FQ_CODEL=y   # 启用 FQ-CoDel（Fair Queuing Controlled Delay）
 CONFIG_NET_SCH_FQ=y         # 启用 Fair Queueing（FQ）调度算法，用于优化流量公平性，减少某些连接的垄断
 ```
 
-## 1.2 基础数据结构
+# 2 基础数据结构
 
-### 1.2.1 list
+## 2.1 list
 
 ```c
 struct list_head {
@@ -76,7 +74,7 @@ struct list_head {
 };
 ```
 
-### 1.2.2 hash list
+## 2.2 hash list
 
 Linux 内核中哈希链表用 `struct hlist_node` 结构体表示。使用 `struct hlist_head` 作为入口，不直接使用 `struct hlist_node` 是为了节省一个指针的空间，因为对 `head` 节点来说不需要 `prev` 指针。
 
@@ -98,9 +96,9 @@ struct hlist_node {
 };
 ```
 
-## 1.3 高级数据结构
+# 3 高级数据结构
 
-### 1.3.1 completion
+## 3.1 completion
 
 completion类似C++中的条件变量condition_variable，基于轻量级的 waitqueue (swait_queue) 实现。swait_queue 常用于只允许单个进程等待的轻量级同步场景。这个结构通常是栈上的局部变量（不像 wait_queue 那样支持多个等待者），用于表示当前进程正在某个 swait_queue_head 上等待。
 
@@ -114,7 +112,7 @@ struct completion {
 
 completion 对外暴露成对的接口：等待和唤醒。
 
-#### 1.3.1.1 唤醒
+### 3.1.1 唤醒
 
 唤醒分为普通唤醒和全部唤醒。
 
@@ -122,13 +120,13 @@ completion 对外暴露成对的接口：等待和唤醒。
 
 swake_up_xx() 函数实现很直接，遍历链表拿到每一个进程（实际只有一个），调用 wake_up_process() 唤醒，并将该进程从链表中删除：[swake_up_locked()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/swait.c#L21) 
 
-#### 1.3.1.2 等待
+### 3.1.2 等待
 
 等待过程比较直观：将当前进程加入到 wait 指向的队列中，修改当前进程状态，调用 schedule() 让出CPU。待进程被唤醒，检查done字段是否非0（避免误唤醒），如果非0，说明等待条件成熟，done-- 后返回即可： [do_wait_for_common()](https://elixir.bootlin.com/linux/v6.1/source/kernel/sched/completion.c#L71) 
 
 等待还有一种类型是超时等待，即超时一定时间条件未成熟也强制唤醒。实现上就是多了一个定时器：[schedule_timeout()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L1933) ，待超时后将进程强制唤醒：[process_timeout()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L1862) 
 
-#### 1.3.1.3 为什么有swake_up_all() 
+### 3.1.3 为什么有swake_up_all() 
 
 既然 swait_queue 只允许单个进程等待，为什么会有swake_up_all()这种函数呢？ChatGPT给的答案如下：
 
@@ -139,7 +137,7 @@ swake_up_xx() 函数实现很直接，遍历链表拿到每一个进程（实际
 | ✅ 实际效果   | 虽然通常只有一个等待者，`swake_up_all` 仍会遍历整个链表      |
 | ⚠️ 使用建议   | 大多数场景下用 `swake_up()`，`swake_up_all()` 仅用于防御或调试目的 |
 
-### 1.3.2 wait_queue
+## 3.2 wait_queue
 
 -   [Linux等待队列（Wait Queue）](https://hughesxu.github.io/posts/Linux_Wait_Queue/) 
 
@@ -162,7 +160,7 @@ struct wait_queue_head {
 
 ![](https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97%E7%BB%93%E6%9E%84.svg)
 
-### 1.3.3 workqueue
+## 3.3 workqueue
 
 workqueue 类似 C++ 中的线程池，通过异步的方式推后一个函数的执行。这个函数具体什么时候执行，依赖于**内核的进程调度**。
 
@@ -184,7 +182,7 @@ struct workqueue_struct {
 }
 ```
 
-### 1.3.4 tasklet
+## 3.4 tasklet
 
 tasklet 也是通过异步的方式推后一个函数的执行，但它的原理不是基于进程调度，而是基于软中断上下文，不能睡眠。
 
@@ -204,7 +202,7 @@ struct tasklet_struct
 };
 ```
 
-### 1.3.5 timer
+## 3.5 timer
 
 -   [带你走进linux 内核 定时器（timer）实现机制](https://zhuanlan.zhihu.com/p/544432546) 
 
@@ -228,7 +226,7 @@ struct timer_base {
 
 <img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
 
-#### 1.3.5.1 确定time_list对应的桶
+### 3.5.1 确定time_list对应的桶
 
 [calc_wheel_index()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L533) 函数通过计算离到期 jiffies 的长短，决定定时器放置到哪个桶下，每个桶的粒度（精度）是不同的。
 
@@ -244,10 +242,56 @@ struct timer_base {
 | 7     | 448    | 2097152 Ticks  | [16777216, 134217727]   |
 | 8     | 512    | 16777216 Ticks | [134217728, 1073741822] |
 
-#### 1.3.5.2 time_list加入到对应的桶
+### 3.5.2 time_list加入到对应的桶
 
  [enqueue_timer()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/timer.c#L601) 函数会将定时器放到 timer_base 的某个桶中。
 
-#### 1.3.5.3 时钟中断处理
+### 3.5.3 时钟中断处理
 
 时钟中断触发时，[tick_periodic()](https://elixir.bootlin.com/linux/v6.1/source/kernel/time/tick-common.c#L85) 函数会执行具体的工作。主要的函数调用流：`update_process_times() -> run_local_timers() -> raise_softirq(TIMER_SOFTIRQ) -> run_timer_softirq()`。更详细的关系，可以在自己设置的定时器的回调函数中通过`dump_stack()` 打印出来。
+
+# 4 Profiling
+
+-   [Linux tracing/profiling 基础：符号表、调用栈、perf/bpftrace 示例](https://arthurchiao.art/blog/linux-tracing-basis-zh/) 
+-   [Linux Socket Filtering (LSF, aka BPF)](https://arthurchiao.art/blog/linux-socket-filtering-aka-bpf-zh/) 
+-   [使用 Linux tracepoint、perf 和 eBPF 跟踪数据包](https://arthurchiao.art/blog/trace-packet-with-tracepoint-perf-ebpf-zh/) 
+-   [连接跟踪（conntrack）：原理、应用及 Linux 内核实现](https://arthurchiao.art/blog/conntrack-design-and-implementation-zh/) 
+
+## 4.1 perf
+
+`perf` 是通用的“性能采样分析工具”，适合查找函数热点、分析 CPU 使用率
+
+```bash
+$ perf record -a -g -- sleep 5         # 采样并生成性能数据
+$ perf report                          # 输出图形报告
+$ perf script                          # 输出文本报告，便于脚本处理
+```
+
+## 4.2 bpftrace 
+
+`bpftrace` 是基于内核提供的 eBPF 能力，通过编写awk一样的跟踪语句的高级工具。
+
+### 4.2.1 基本语法
+
+```bash
+probe-type /filter/ { action; }
+# probe-type：如 kprobe, tracepoint, uprobe, usdt, software
+# filter：条件语句（可选）
+# action：你想执行的行为（打印、计数等）
+```
+
+### 4.2.2 例子
+
+```bash
+# 追踪 read() 系统调用的返回大小
+tracepoint:syscalls:sys_exit_read
+/args->ret > 0/
+{
+    printf("read() returned %d bytes in process %s\n", args->ret, comm);
+}
+```
+
+
+
+
+
