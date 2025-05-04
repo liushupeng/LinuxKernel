@@ -1,7 +1,4 @@
-#define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define pr_fmt(fmt) "%s:%s:%d:%s() " fmt, KBUILD_MODNAME, FILENAME, __LINE__, __func__
-
-#include "common.h"
+#include "utils.h"
 #include <linux/cdev.h>
 #include <linux/fs.h>
 
@@ -118,7 +115,7 @@ int basicdevice_create_device(void)
 #else
 int basicdevice_create_device(void)
 {
-    int  result;
+    int result;
 
     result = create_device(dev_num, DEVICE_NAME);
     if (result != 0) {

@@ -1,3 +1,4 @@
+#include "adjust_fmt.h"
 #include <linux/kmod.h>
 #include <linux/kdev_t.h>
 #include <linux/kernel.h>
