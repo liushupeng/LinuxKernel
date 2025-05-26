@@ -158,7 +158,7 @@ struct wait_queue_head {
 };
 ```
 
-![](https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97%E7%BB%93%E6%9E%84.svg)
+![](https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0_Misc_%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97%E7%BB%93%E6%9E%84.svg)
 
 ## 3.3 workqueue
 
@@ -224,7 +224,7 @@ struct timer_base {
 } ____cacheline_aligned;
 ```
 
-<img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
+<img src="https://cloud-image-aliyun.oss-cn-beijing.aliyuncs.com/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0_Misc_%E5%AE%9A%E6%97%B6%E5%99%A8%E7%BB%93%E6%9E%84.png" style="zoom:60%;" />
 
 ### 3.5.1 确定time_list对应的桶
 
