@@ -29,7 +29,7 @@ clean:
 .PHONY: modules modules_install test clean
 
 else
-	ccflags-y += -I$(shell dirname $(PWD))/include
+	ccflags-y += -I$(shell dirname $(shell dirname $(PWD)))/include
     # called from kernel build system: just declare what our modules are
     obj-m := mapping.o
 endif
