@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
     read_bytes = int80_read(fd, read_buff);
     if (read_bytes < 0) {
-        printf("int80_read %lu bytes from %s failed\n", sizeof(read_buff), path);
+        printf("int80_read %u bytes from %s failed\n", sizeof(read_buff), path);
         return read_bytes;
     }
 
