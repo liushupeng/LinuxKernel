@@ -1,4 +1,4 @@
-# Linux内核轻松入坑
+# 从 Hello Kernel 到 Bye Kernel
 
 - [Linux 内核学习笔记](https://freeflyingsheep.github.io/zh-cn/posts/introduction/) $^{[1]}$ 
 - [Linux内核应该怎么去学习](https://www.zhihu.com/question/58121772) $^{[2]}$ 
