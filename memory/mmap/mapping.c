@@ -11,14 +11,12 @@ static struct cdev cdevs[DEVICE_NUM]; /* char device array */
 MODULE_AUTHOR("Liu ShuPeng");
 MODULE_LICENSE("Dual BSD/GPL");
 
-int mapping_open(struct inode* inode, struct file* filp)
-{
+int mapping_open(struct inode* inode, struct file* filp) {
     pr_info("Enter open() ...\n");
     return 0;
 }
 
-int mapping_release(struct inode* inode, struct file* filp)
-{
+int mapping_release(struct inode* inode, struct file* filp) {
     pr_info("Enter close() ...\n");
     return 0;
 }
@@ -26,16 +24,14 @@ int mapping_release(struct inode* inode, struct file* filp)
 /*
  * Common VMA ops.
  */
-void mapping_vma_open(struct vm_area_struct* vma)
-{
+void mapping_vma_open(struct vm_area_struct* vma) {
     pr_notice("VMA open, start:0x%lx, size:%lu, offset:%lx.\n",
               vma->vm_start,
               vma->vm_end - vma->vm_start,
               vma->vm_pgoff << PAGE_SHIFT);
 }
 
-void mapping_vma_close(struct vm_area_struct* vma)
-{
+void mapping_vma_close(struct vm_area_struct* vma) {
     pr_notice("VMA close, start:0x%lx, size:%lu, offset:%lx.\n",
               vma->vm_start,
               vma->vm_end - vma->vm_start,
@@ -47,10 +43,8 @@ struct vm_operations_struct mapping_remap_vm_ops = {
     .close = mapping_vma_close,
 };
 
-int mapping_remap_mmap(struct file* filp, struct vm_area_struct* vma)
-{
-    if (remap_pfn_range(
-            vma, vma->vm_start, vma->vm_pgoff, vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
+int mapping_remap_mmap(struct file* filp, struct vm_area_struct* vma) {
+    if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff, vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
         return -EAGAIN;
     }
 
@@ -62,14 +56,12 @@ int mapping_remap_mmap(struct file* filp, struct vm_area_struct* vma)
     return 0;
 }
 
-vm_fault_t mapping_vma_fault(struct vm_fault* vmf)
-{
+vm_fault_t mapping_vma_fault(struct vm_fault* vmf) {
     struct vm_area_struct* vma = vmf->vma; /* VMA with page fault */
 
-    unsigned long address = vmf->address; /* virtual address with page fault */
-    unsigned long offset  = vma->vm_pgoff << PAGE_SHIFT;
-    unsigned long physaddr =
-        address - vma->vm_start + offset; /* virtual address to physical address */
+    unsigned long address   = vmf->address; /* virtual address with page fault */
+    unsigned long offset    = vma->vm_pgoff << PAGE_SHIFT;
+    unsigned long physaddr  = address - vma->vm_start + offset; /* virtual address to physical address */
     unsigned long pageframe = physaddr >> PAGE_SHIFT;
 
     pr_notice("offset:%lu, physaddr:%lx.\n", offset, physaddr);
@@ -78,10 +70,7 @@ vm_fault_t mapping_vma_fault(struct vm_fault* vmf)
         return VM_FAULT_SIGBUS;
     }
     vmf->page = pfn_to_page(pageframe);
-    pr_notice("Page frame:%ld, page->index:%ld, mapping:%p.\n",
-              pageframe,
-              vmf->page->index,
-              vmf->page->mapping);
+    pr_notice("Page frame:%ld, page->index:%ld, mapping:%p.\n", pageframe, vmf->page->index, vmf->page->mapping);
 
     /* increase counter */
     get_page(vmf->page);
@@ -95,8 +84,7 @@ static struct vm_operations_struct mapping_fault_vm_ops = {
     .fault = mapping_vma_fault,
 };
 
-int mapping_fault_mmap(struct file* filp, struct vm_area_struct* vma)
-{
+int mapping_fault_mmap(struct file* filp, struct vm_area_struct* vma) {
     unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
     if (offset >= __pa(high_memory) || (filp->f_flags & O_SYNC)) {
@@ -130,8 +118,7 @@ struct file_operations mapping_fops[DEVICE_NUM] = {
     /* others ... */
 };
 
-void mapping_cleanup(void)
-{
+void mapping_cleanup(void) {
     for (int i = 0; i < DEVICE_NUM; i++) {
         if (cdevs[i].count != 0) {
             cdev_del(cdevs + i);
@@ -143,8 +130,7 @@ void mapping_cleanup(void)
     }
 }
 
-int mapping_init(void)
-{
+int mapping_init(void) {
     int result;
     memset(cdevs, 0, sizeof(cdevs));
 
@@ -157,11 +143,7 @@ int mapping_init(void)
         return result;
     }
     for (int i = 0; i < DEVICE_NUM; i++) {
-        pr_notice("Device:/dev/%s%d major:%d minor:%d\n",
-                  DEVICE_NAME,
-                  i,
-                  MAJOR(dev_num + i),
-                  MINOR(dev_num + i));
+        pr_notice("Device:/dev/%s%d major:%d minor:%d\n", DEVICE_NAME, i, MAJOR(dev_num + i), MINOR(dev_num + i));
     }
 
     /*

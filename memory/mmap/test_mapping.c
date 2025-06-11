@@ -5,8 +5,7 @@
 
 #define MEM_SIZE 4096
 
-int trigger_mapping_remap(void)
-{
+int trigger_mapping_remap(void) {
     const char* dev_name = "/dev/mapping0";
 
     int fd = open(dev_name, O_RDWR);
@@ -29,8 +28,7 @@ int trigger_mapping_remap(void)
     return 0;
 }
 
-int trigger_mapping_nopage(void)
-{
+int trigger_mapping_nopage(void) {
     const char* dev_name = "/dev/mapping1";
 
     int fd = open(dev_name, O_RDWR);
@@ -55,8 +53,7 @@ int trigger_mapping_nopage(void)
     close(fd);
 }
 
-int main()
-{
+int main() {
     printf("Run trigger_mapping_remap() ...\n");
     trigger_mapping_remap();
 
