@@ -44,14 +44,28 @@ NamespaceIndentation: All
 
 # include 排序
 SortIncludes: true
-IncludeBlocks: Regroup
+IncludeBlocks: Preserve  # 保留空行分隔的 include block
 IncludeCategories:
-  - Regex: '^<.*\.h>'
+  - Regex: "^\".*\""         # 1. 项目本地头文件 "myfile.h"
     Priority: 1
-  - Regex: '^".*\.h"'
+    SortPriority: 0
+    CaseSensitive: false
+
+  - Regex: "^<c.*>"          # 2. C++ 标准库（以 <c 开头的，如 <cstdio>）
     Priority: 2
-  - Regex: '.*'
+    SortPriority: 1
+
+  - Regex: "^<(iostream|vector|string|map|set|memory|algorithm).*>"  # 3. 其他 C++ 标准库
     Priority: 3
+    SortPriority: 2
+
+  - Regex: "^<.*>"           # 4. 其他系统/第三方库头文件
+    Priority: 4
+    SortPriority: 3
+
+  - Regex: ".*"              # 5. 兜底匹配（例如可能出错的包含）
+    Priority: 5
+    SortPriority: 4
 
 # 空行控制
 KeepEmptyLinesAtTheStartOfBlocks: false
@@ -59,4 +73,11 @@ MaxEmptyLinesToKeep: 1
 
 # 最大列宽
 ColumnLimit: 100
+
+# 启用对齐多个宏定义
+AlignConsecutiveMacros: true
+AllowShortBlocksOnASingleLine: false
+
+# 控制在多行表达式中二元运算符（如 +, -, , && 等）的位置
+BreakBeforeBinaryOperators: None
 
