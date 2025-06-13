@@ -12,14 +12,20 @@ ifeq ($(KERNELRELEASE),)
     # The current directory is passed to sub-makes as argument
     PWD := $(shell pwd)
 
+all: modules build
+
 modules:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 modules_install:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules_install
 
+build: modules
+	@mkdir -p $(PWD)/build
+	@mv *.o *.ko *.mod.c *.mod .*.cmd modules.order Module.symvers $(PWD)/build
+
 clean:
-	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions *.mod modules.order Module.symvers
+	rm -rf $(PWD)/build
 
 .PHONY: modules modules_install clean
 
