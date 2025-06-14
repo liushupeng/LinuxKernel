@@ -13,7 +13,8 @@ UseTab: Never  # 统一使用空格
 BreakBeforeBraces: Attach  # K&R -> SameLine / Allman -> NewLine（更清晰）
 AllowShortLoopsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: InlineOnly
+# 允许短的函数放在同一行: None, InlineOnly(定义在类中), Empty(空函数), Inline(定义在类中，空函数), All
+AllowShortFunctionsOnASingleLine: All
 
 # 空格设置
 SpaceBeforeParens: ControlStatements  # `if (...)` 空格在控制结构后
