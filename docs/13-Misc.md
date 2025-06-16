@@ -291,7 +291,18 @@ tracepoint:syscalls:sys_exit_read
 }
 ```
 
+# 5 重要组件
 
+## 5.1 GDT/LDT/IDT/TSS
+
+| 组件 | 全称                       | 基址所属寄存器 | 作用                                                         | 是否每个进程不同      |
+| ---- | -------------------------- | -------------- | ------------------------------------------------------------ | --------------------- |
+| GDT  | Global Descriptor Table    | GDTR           | 保存所有段（代码段、数据段、栈段、TSS等）的段描述符，用于整个系统 | 否，全局共享          |
+| LDT  | Local Descriptor Table     | LDTR           | 每个进程专属的段描述符表，现在很少用，因为现代 Linux 主要依赖 GDT + 页表实现内存隔离 | 是                    |
+| IDT  | Interrupt Descriptor Table | IDTR           | 管理 CPU 的中断和异常处理机制，保存 0～255 个中断向量对应的处理程序地址 | 否，全局共享          |
+| TSS  | Task State Segment         | TR             | 保存任务切换时的 CPU 寄存器状态，每个 CPU 有自己的 TSS       | 是，每个 CPU/线程一个 |
+
+ 
 
 
 
