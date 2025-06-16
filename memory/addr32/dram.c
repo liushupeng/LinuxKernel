@@ -43,7 +43,7 @@ ssize_t dram_read(struct file* file, char __user* buf, size_t count, loff_t* f_p
     unsigned long pfn        = phys_addr >> PAGE_SHIFT;
     unsigned long offset     = phys_addr & (PAGE_SIZE - 1);
 
-    pr_info("Expected reading %lu bytes from f_pos=%lld. ", count, *f_pos);
+    pr_debug("Expected reading %lu bytes from f_pos=%lld. ", count, *f_pos);
     // out of range
     if (*f_pos >= dram_size) {
         pr_cont("Finally read 0 byte.\n");
@@ -83,7 +83,7 @@ ssize_t dram_read(struct file* file, char __user* buf, size_t count, loff_t* f_p
 loff_t dram_llseek(struct file* file, loff_t offset, int whence) {
     loff_t newpos = -EINVAL;
 
-    pr_info("DRAM lseek offset=%lld based on whence=%d. ", offset, whence);
+    pr_debug("DRAM lseek offset=%lld based on whence=%d. ", offset, whence);
     switch (whence) {
     case SEEK_SET:
         newpos = offset;

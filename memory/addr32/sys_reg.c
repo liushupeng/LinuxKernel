@@ -40,7 +40,7 @@ ssize_t get_reg_info(struct file* filp, char __user* buf, size_t count, loff_t* 
                    gdtr.address,
                    gdtr.limit);
 
-    pr_info("Expected reading %lu bytes from f_pos=%lld. ", count, *f_pos);
+    pr_debug("Expected reading %lu bytes from f_pos=%lld. ", count, *f_pos);
     if (*f_pos >= size) {
         count = 0;
     } else {
