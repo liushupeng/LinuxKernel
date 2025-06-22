@@ -40,8 +40,8 @@ AllowAllParametersOfDeclarationOnNextLine: true
 # 注释配置
 CommentPragmas: '^ IWYU pragma:'
 
-# 命名空间设置（主要用于 C++）
-NamespaceIndentation: All
+# 命名空间设置（主要用于 C++）: Inner(缩进命名空间内的内容), All(所有命名空间缩进，包括内联命名空间等)
+NamespaceIndentation: None
 
 # include 排序
 SortIncludes: true
